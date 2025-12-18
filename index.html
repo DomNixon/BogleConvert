@@ -21,8 +21,8 @@
         theme: {
           extend: {
             colors: {
-              primary: "#6e5de9", // Purple accent
-              secondary: "#13a4ec", // Blue accent
+              primary: "#6e5de9",
+              secondary: "#13a4ec",
               "bg-dark": "#0a090d",
               surface: "#131219",
               outline: "#23222f",
@@ -49,7 +49,6 @@
       .material-symbols-outlined.fill {
         font-variation-settings: "FILL" 1;
       }
-      /* Custom Scrollbar for dark theme */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
@@ -65,18 +64,9 @@
         background: #3f3d52;
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.1/",
-    "react": "https://aistudiocdn.com/react@^19.2.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "recharts": "https://aistudiocdn.com/recharts@^3.5.1"
-  }
-}
-</script>
-</head>
+  </head>
   <body>
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
