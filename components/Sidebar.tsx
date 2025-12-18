@@ -1,0 +1,82 @@
+
+import React from 'react';
+import { ViewState, UserProfile } from '../types';
+
+interface SidebarProps {
+  currentView: ViewState;
+  onChangeView: (view: ViewState) => void;
+  user: UserProfile;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user }) => {
+  const navItems = [
+    { id: ViewState.PHILOSOPHY, label: 'The Guide', icon: 'menu_book' },
+    { id: ViewState.DASHBOARD, label: 'Portfolio', icon: 'pie_chart' },
+    { id: ViewState.REPORT, label: 'Stock Report', icon: 'description' },
+    { id: ViewState.ANALYSIS, label: 'Analysis', icon: 'analytics' },
+    { id: ViewState.SETTINGS, label: 'Settings', icon: 'settings' },
+  ];
+
+  return (
+    <aside className="hidden md:flex w-64 flex-col border-r border-outline bg-surface p-4 transition-all duration-300 ease-in-out">
+      <div className="mb-8 flex items-center gap-3 px-2">
+        <span className="material-symbols-outlined text-3xl text-secondary">candlestick_chart</span>
+        <p className="text-xl font-bold font-display text-white">BogleConvert</p>
+      </div>
+
+      <nav className="flex flex-col gap-2">
+        {navItems.map((item) => {
+          const isActive = currentView === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => onChangeView(item.id)}
+              className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+                isActive ? 'text-white' : 'text-muted hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              {isActive && (
+                <>
+                  <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-primary/20 to-secondary/20 opacity-100" />
+                  <div className="absolute left-0 top-0 h-full w-1 rounded-l-lg bg-gradient-to-b from-primary to-secondary" />
+                </>
+              )}
+              <span className={`material-symbols-outlined text-xl ${isActive ? 'fill' : ''}`}>
+                {item.icon}
+              </span>
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="mt-auto flex flex-col gap-4">
+        {/* Support/Donate Box */}
+        <div className="rounded-lg bg-gradient-to-br from-amber-500/10 to-orange-600/10 p-4 text-center border border-amber-500/20">
+          <div>
+            <p className="text-sm font-medium text-white">Enjoying BogleConvert?</p>
+            <p className="mt-2 text-xs text-muted leading-relaxed">Your support keeps the servers running and the data flowing.</p>
+          </div>
+          <button className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-white py-1.5 text-sm font-semibold text-black transition-all hover:bg-amber-50 hover:text-amber-900 group">
+            <span className="material-symbols-outlined text-base group-hover:animate-bounce">local_cafe</span>
+            <span>Buy me a coffee</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3 border-t border-outline pt-4">
+          <img
+            alt="User avatar"
+            className="h-9 w-9 flex-shrink-0 rounded-full object-cover border border-outline"
+            src={user.avatarUrl}
+          />
+          <div className="flex flex-col items-start overflow-hidden">
+            <p className="text-sm font-medium text-white truncate w-full">{user.name}</p>
+            <p className="text-xs text-muted truncate w-full">{user.email}</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+};
+
+export default Sidebar;
