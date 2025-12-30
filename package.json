@@ -11,7 +11,8 @@
   "dependencies": {
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
-    "recharts": "^3.5.1"
+    "recharts": "^3.5.1",
+    "wrangler": "^4.54.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251230.0",
