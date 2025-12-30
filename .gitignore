@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Credentials
+.env
+.gitignore
+
+# AI Agents Rules and Workflow
+/Rules/
+/Workflow/
+/Logs/
