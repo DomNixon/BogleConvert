@@ -6,7 +6,15 @@ import Settings from './components/Settings';
 import StockReport from './components/StockReport';
 import HelpAbout from './components/HelpAbout';
 import { ViewState, UserProfile, StockPosition, ChartDataPoint } from './types';
-import { getUserProfile, getPortfolioData, getChartData, fetchStockQuote, getCumulativeInflation, DEMO_PORTFOLIO } from './services/dataService';
+import {
+  getUserProfile,
+  getPortfolioData,
+  getChartData,
+  fetchStockQuote,
+  getCumulativeInflation,
+  DEMO_PORTFOLIO,
+  refreshMarketData
+} from './services/dataService';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.DASHBOARD);
@@ -54,6 +62,8 @@ const App: React.FC = () => {
   useEffect(() => {
     const initData = async () => {
       try {
+        await refreshMarketData(); // On-Demand Refresh Check
+
         const [userData, portfolioData] = await Promise.all([
           getUserProfile(),
           getPortfolioData()

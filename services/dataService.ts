@@ -166,6 +166,19 @@ export const getUserProfile = async (): Promise<UserProfile> => {
   };
 };
 
+export const refreshMarketData = async (): Promise<void> => {
+  try {
+    // Trigger the on-demand refresh endpoint
+    // This endpoint now intelligently only fetches if data is missing or stale
+    const res = await fetch('/api/refresh-data');
+    if (!res.ok) {
+      console.warn('Market data refresh failed', res.statusText);
+    }
+  } catch (e) {
+    console.error('Error triggering market data refresh', e);
+  }
+};
+
 export const fetchStockQuote = async (ticker: string): Promise<{ price: number; name: string; sector: string; dailyChange: number; yearlyReturn: number; lastUpdated: string } | null> => {
   if (!ticker) return null;
   const t = ticker.toUpperCase();

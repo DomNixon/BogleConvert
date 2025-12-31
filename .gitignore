@@ -29,7 +29,7 @@ dist-ssr
 # Dev 
 .gitignore
 .dev.vars
-/.wrangler/
+.wrangler/
 
 # AI Agents Rules and Workflow
 /Rules/
