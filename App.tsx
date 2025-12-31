@@ -6,7 +6,7 @@ import Settings from './components/Settings';
 import StockReport from './components/StockReport';
 import HelpAbout from './components/HelpAbout';
 import { ViewState, UserProfile, StockPosition, ChartDataPoint } from './types';
-import { getUserProfile, getPortfolioData, getChartData, fetchStockQuote, getCumulativeInflation } from './services/dataService';
+import { getUserProfile, getPortfolioData, getChartData, fetchStockQuote, getCumulativeInflation, DEMO_PORTFOLIO } from './services/dataService';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.DASHBOARD);
@@ -112,7 +112,10 @@ const App: React.FC = () => {
       const stock = { ...newPortfolio[index] };
 
       // Update the specific field
-      (stock as any)[field] = value;
+      // FIX: Use type assertion for dynamic key access to ensure type safety
+      if (field in stock) {
+        (stock as any)[field] = value;
+      }
 
       // Recalculate returns if Average Cost or Years is updated
       if (field === 'avgCost' || field === 'yearsHeld') {
@@ -250,6 +253,12 @@ const App: React.FC = () => {
     reader.readAsText(file);
   };
 
+  const handleLoadDemo = () => {
+    // Deep copy the demo portfolio to avoid reference issues
+    const demo = JSON.parse(JSON.stringify(DEMO_PORTFOLIO));
+    setPortfolio(demo);
+  };
+
   const handleUpdateProfile = (updates: Partial<UserProfile>) => {
     if (user) {
       setUser({ ...user, ...updates });
@@ -280,6 +289,7 @@ const App: React.FC = () => {
             onViewReport={handleViewReport}
             onAddRow={handleAddRow}
             onBulkImport={handleBulkImport}
+            onLoadDemo={handleLoadDemo}
           />
         );
       case ViewState.ANALYSIS:
@@ -319,6 +329,7 @@ const App: React.FC = () => {
             onViewReport={handleViewReport}
             onAddRow={handleAddRow}
             onBulkImport={handleBulkImport}
+            onLoadDemo={handleLoadDemo}
           />
         );
     }

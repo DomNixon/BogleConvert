@@ -27,7 +27,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         return new Response(JSON.stringify(masterPrices), {
             headers: {
                 'Content-Type': 'application/json',
-                'Cache-Control': 'public, max-age=2592000', // 30 days
+                'Cache-Control': 'public, max-age=86400', // 24 hours
             },
         });
 

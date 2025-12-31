@@ -25,10 +25,19 @@ dist-ssr
 
 # Credentials
 .env
+
+# Dev 
 .gitignore
 .dev.vars
+/.wrangler/
 
 # AI Agents Rules and Workflow
 /Rules/
 /Workflow/
 /Logs/
+.wrangler/tmp/bundle-8VgDmw/middleware-insertion-facade.js
+.wrangler/tmp/bundle-8VgDmw/middleware-loader.entry.ts
+.wrangler/tmp/dev-yOJBRU/functionsWorker-0.03205349522715517.js
+.wrangler/tmp/dev-yOJBRU/functionsWorker-0.03205349522715517.js.map
+.wrangler/tmp/pages-7xFjOl/functionsWorker-0.03205349522715517.mjs
+.wrangler/tmp/pages-7xFjOl/functionsWorker-0.03205349522715517.mjs.map

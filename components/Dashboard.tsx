@@ -14,6 +14,7 @@ interface DashboardProps {
     onViewReport: (ticker: string) => void;
     onAddRow: () => void;
     onBulkImport: (file: File) => void;
+    onLoadDemo: () => void;
     benchmark: 'VT' | 'VTI' | 'VOO';
     onBenchmarkChange: (b: 'VT' | 'VTI' | 'VOO') => void;
 }
@@ -203,6 +204,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     onViewReport,
     onAddRow,
     onBulkImport,
+    onLoadDemo,
     benchmark,
     onBenchmarkChange
 }) => {
@@ -490,7 +492,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                     <div className="flex flex-col items-center gap-3">
                                                         <span className="material-symbols-outlined text-4xl opacity-50">table_rows</span>
                                                         <p>Your portfolio is empty. Add a position manually or drag & drop a CSV.</p>
-                                                        <button onClick={onAddRow} className="text-secondary hover:underline text-sm">Add First Position</button>
+                                                        <div className="flex gap-4">
+                                                            <button onClick={onAddRow} className="text-secondary hover:underline text-sm">Add First Position</button>
+                                                            <button onClick={onLoadDemo} className="text-muted hover:text-white hover:underline text-sm">Load Demo Portfolio</button>
+                                                        </div>
                                                     </div>
                                                 </td>
                                             </tr>
