@@ -39,7 +39,7 @@ const HISTORICAL_INFLATION_RATES: { year: number; rate: number }[] = [
   { year: 2009, rate: -0.4 }, { year: 2010, rate: 1.6 }, { year: 2011, rate: 3.2 }, { year: 2012, rate: 2.1 }, { year: 2013, rate: 1.5 },
   { year: 2014, rate: 1.6 }, { year: 2015, rate: 0.1 }, { year: 2016, rate: 1.3 }, { year: 2017, rate: 2.1 }, { year: 2018, rate: 2.4 },
   { year: 2019, rate: 1.8 }, { year: 2020, rate: 1.2 }, { year: 2021, rate: 4.7 }, { year: 2022, rate: 8.0 }, { year: 2023, rate: 3.4 },
-  { year: 2024, rate: 3.1 }, { year: 2025, rate: 2.5 } // 2025 Forecast
+  { year: 2024, rate: 2.6 }, { year: 2025, rate: 2.3 } // 2025 Forecast
 ];
 
 // Approximate VT (Vanguard Total World Stock ETF) Annual Returns
@@ -105,7 +105,6 @@ const VOO_ANNUAL_RETURNS: { year: number; return: number }[] = [
   { year: 2024, return: 25.0 },
 ];
 
-// Helper: Current Real-World Prices (Approximated for Demo Context)
 // Master Price Cache (populated once per session or from local storage)
 let MASTER_PRICE_CACHE: Record<string, { price: number; last_pulled: string }> | null = null;
 let FETCH_PROMISE: Promise<void> | null = null;
@@ -288,7 +287,7 @@ export const getCumulativeInflation = (yearsHeld: number): number => {
 
   if (remainder > 0) {
     const rate = rates[fullYears] ? rates[fullYears].rate : 3.0;
-    totalInflation *= (1 + (rate / 100) * remainder);
+    totalInflation *= Math.pow((1 + rate / 100), remainder);
   }
 
   return totalInflation - 1;

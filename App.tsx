@@ -32,7 +32,8 @@ const App: React.FC = () => {
       stock.inflationAdjReturn = Number(realReturn.toFixed(1));
 
       // Calculate CAGR (Annual Growth)
-      const years = stock.yearsHeld > 0 ? stock.yearsHeld : 0.1; // Avoid divide by zero
+      // For holdings < 1 year, use 1 year minimum to avoid unrealistic CAGR spikes
+      const years = stock.yearsHeld > 0 ? Math.max(stock.yearsHeld, 1) : 1;
       const totalRatio = stock.currentPrice / stock.avgCost;
       // Formula: (Ending / Beginning) ^ (1 / n) - 1
       const cagr = (Math.pow(totalRatio, 1 / years) - 1) * 100;
@@ -292,6 +293,7 @@ const App: React.FC = () => {
         return (
           <Settings
             user={user}
+            portfolio={portfolio}
             onUpdateProfile={handleUpdateProfile}
           />
         );
