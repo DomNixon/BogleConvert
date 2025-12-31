@@ -1,6 +1,4 @@
-export interface Env {
-    PRICES: KVNamespace;
-}
+import { fetchAndCachePrices, Env, StockData } from '../utils/stockData';
 
 export const onRequest: PagesFunction<Env> = async (context) => {
     const { env } = context;
@@ -10,24 +8,50 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     try {
-        const masterPrices = await env.PRICES.get('MASTER_PRICES', { type: 'json' });
+        let masterPrices = await env.PRICES.get<Record<string, StockData>>('MASTER_PRICES', { type: 'json' });
+        let needsRefresh = false;
 
         if (!masterPrices) {
-            // If no data is found, return an empty object or a specific error code
-            // depending on how the frontend handles it. For now, empty object.
+            needsRefresh = true;
+        } else {
+            // Check Freshness (e.g., is data older than 24 hours?)
+            // We check the first key's timestamp as a proxy for the whole set
+            const firstKey = Object.keys(masterPrices)[0];
+            if (firstKey && masterPrices[firstKey]?.last_pulled) {
+                const lastPulled = new Date(masterPrices[firstKey].last_pulled).getTime();
+                const now = new Date().getTime();
+                const hoursDiff = (now - lastPulled) / (1000 * 60 * 60);
+
+                if (hoursDiff > 24) {
+                    needsRefresh = true;
+                }
+            } else {
+                needsRefresh = true;
+            }
+        }
+
+        if (needsRefresh) {
+            console.log("Data stale or missing. Triggering on-demand refresh...");
+            const refreshResult = await fetchAndCachePrices(env);
+            if (refreshResult) {
+                masterPrices = refreshResult.prices;
+            }
+        }
+
+        if (!masterPrices) {
             return new Response(JSON.stringify({}), {
                 headers: {
                     'Content-Type': 'application/json',
-                    'Cache-Control': 'public, max-age=60', // Short cache if empty/error
+                    'Cache-Control': 'public, max-age=60',
                 },
             });
         }
 
-        // Return the cached data with a long cache time (4 hours)
+        // Return the data
         return new Response(JSON.stringify(masterPrices), {
             headers: {
                 'Content-Type': 'application/json',
-                'Cache-Control': 'public, max-age=86400', // 24 hours
+                'Cache-Control': 'public, max-age=14400', // Client cache 4 hours
             },
         });
 
