@@ -17,6 +17,7 @@ interface DashboardProps {
     onLoadDemo: () => void;
     benchmark: 'VT' | 'VTI' | 'VOO';
     onBenchmarkChange: (b: 'VT' | 'VTI' | 'VOO') => void;
+    onViewGuide: () => void;
 }
 
 // Internal Memoized Chart Component
@@ -100,7 +101,7 @@ const DashboardChart = React.memo(({ chartData, benchmark }: { chartData: ChartD
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.chart.benchmark }}></div>
-                    <p className="text-sm text-neutral-300">Benchmark ({benchmark})</p>
+                    <p className="text-sm text-neutral-300">Benchmark {benchmark}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full border border-dashed border-emerald-400"></div>
@@ -150,8 +151,8 @@ const DashboardChart = React.memo(({ chartData, benchmark }: { chartData: ChartD
                             stroke={COLORS.chart.benchmark}
                             strokeWidth={2}
                             fill="url(#benchmarkGradient)"
-                            name={`Benchmark (${benchmark})`}
-                            animationDuration={1000}
+                            name={`Benchmark ${benchmark}`}
+                            animationDuration={300}
                         />
                         {/* Inflation Line */}
                         <Area
@@ -162,7 +163,7 @@ const DashboardChart = React.memo(({ chartData, benchmark }: { chartData: ChartD
                             strokeDasharray="5 5"
                             fill="none"
                             name="Inflation"
-                            animationDuration={1000}
+                            animationDuration={300}
                         />
                         {/* Portfolio Line (Dynamic Color) */}
                         <Area
@@ -172,25 +173,13 @@ const DashboardChart = React.memo(({ chartData, benchmark }: { chartData: ChartD
                             strokeWidth={3}
                             fill="none"
                             name="Your Portfolio"
-                            animationDuration={1000}
+                            animationDuration={300}
                         />
                     </AreaChart>
                 </ResponsiveContainer>
             </div>
         </div>
     );
-}, (prevProps, nextProps) => {
-    // Custom comparison function for React.memo
-    // Only re-render if benchmark changes or data length/values change significantly
-    if (prevProps.benchmark !== nextProps.benchmark) return false;
-    if (prevProps.chartData === nextProps.chartData) return true;
-    if (prevProps.chartData.length !== nextProps.chartData.length) return false;
-    // Deep check first/last points to catch data updates
-    const prevFirst = prevProps.chartData[0];
-    const nextFirst = nextProps.chartData[0];
-    if (prevFirst?.portfolio !== nextFirst?.portfolio) return false;
-
-    return true;
 });
 
 
@@ -206,7 +195,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     onBulkImport,
     onLoadDemo,
     benchmark,
-    onBenchmarkChange
+    onBenchmarkChange,
+    onViewGuide
 }) => {
     const [selectedStock, setSelectedStock] = useState<StockPosition | null>(null);
     const [dragActive, setDragActive] = useState(false);
@@ -314,9 +304,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 onChange={(e) => onBenchmarkChange(e.target.value as 'VT' | 'VTI' | 'VOO')}
                                 className="appearance-none bg-white/5 border border-outline text-white text-sm rounded-lg pl-3 pr-8 py-1.5 focus:ring-2 focus:ring-secondary focus:border-secondary outline-none cursor-pointer hover:bg-white/10 transition-colors font-medium"
                             >
-                                <option value="VT">Global (VT)</option>
-                                <option value="VTI">US Total (VTI)</option>
-                                <option value="VOO">S&P 500 (VOO)</option>
+                                <option value="VT" className="bg-bg-dark text-white">Global (VT)</option>
+                                <option value="VTI" className="bg-bg-dark text-white">US Total (VTI)</option>
+                                <option value="VOO" className="bg-bg-dark text-white">S&P 500 (VOO)</option>
                             </select>
                             <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-muted text-lg pointer-events-none">expand_more</span>
                         </div>
@@ -508,7 +498,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         {/* Guide Hint */}
                         <div className="text-center pb-8">
                             <p className="text-muted text-sm">
-                                Need help understanding the chart colors? <button onClick={() => { }} className="text-white hover:underline">Check out The Guide</button>.
+                                Need help understanding the chart colors? <button onClick={onViewGuide} className="text-white hover:underline">Check out The Guide</button>.
                             </p>
                         </div>
 

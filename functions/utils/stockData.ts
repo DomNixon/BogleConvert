@@ -6,8 +6,6 @@ export interface Env {
 
 export interface StockData {
     price: number;
-    last_pulled: string;
-    data_timestamp: string;
 }
 
 interface StockJsonItem {
@@ -26,8 +24,7 @@ export async function fetchAndCachePrices(env: Env): Promise<{ prices: Record<st
                 if (jsonText.trim().startsWith('[')) {
                     const jsonData = JSON.parse(jsonText) as StockJsonItem[];
                     const prices: Record<string, StockData> = {};
-                    const timestamp = new Date().toISOString();
-
+                    
                     for (const item of jsonData) {
                         const ticker = item.symbol;
                         // Remove '$' and parse
@@ -36,15 +33,16 @@ export async function fetchAndCachePrices(env: Env): Promise<{ prices: Record<st
 
                         if (ticker && !isNaN(price)) {
                             prices[ticker.toUpperCase()] = {
-                                price,
-                                last_pulled: timestamp,
-                                data_timestamp: timestamp
+                                price
                             };
                         }
                     }
 
                     if (Object.keys(prices).length > 0) {
-                        await env.PRICES.put('MASTER_PRICES', JSON.stringify(prices));
+                        // Store with Metadata for freshness tracking
+                        await env.PRICES.put('MASTER_PRICES', JSON.stringify(prices), {
+                            metadata: { timestamp: new Date().toISOString() }
+                        });
                         return { prices, source: 'JSON' };
                     }
                 }
@@ -77,7 +75,6 @@ export async function fetchAndCachePrices(env: Env): Promise<{ prices: Record<st
 
         const lines = csvText.split('\n');
         const prices: Record<string, StockData> = {};
-        const timestamp = new Date().toISOString();
         const startIdx = 1;
 
         for (let i = startIdx; i < lines.length; i++) {
@@ -92,16 +89,16 @@ export async function fetchAndCachePrices(env: Env): Promise<{ prices: Record<st
 
                 if (ticker && !isNaN(price)) {
                     prices[ticker] = {
-                        price,
-                        last_pulled: timestamp,
-                        data_timestamp: timestamp,
+                        price
                     };
                 }
             }
         }
 
         if (Object.keys(prices).length > 0) {
-            await env.PRICES.put('MASTER_PRICES', JSON.stringify(prices));
+            await env.PRICES.put('MASTER_PRICES', JSON.stringify(prices), {
+                metadata: { timestamp: new Date().toISOString() }
+            });
             return { prices, source: 'CSV_Fallback' };
         }
 

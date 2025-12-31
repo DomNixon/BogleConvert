@@ -106,7 +106,7 @@ const VOO_ANNUAL_RETURNS: { year: number; return: number }[] = [
 ];
 
 // Master Price Cache (populated once per session or from local storage)
-let MASTER_PRICE_CACHE: Record<string, { price: number; last_pulled: string }> | null = null;
+let MASTER_PRICE_CACHE: Record<string, { price: number }> | null = null;
 let FETCH_PROMISE: Promise<void> | null = null;
 const MASTER_PRICE_STORAGE_KEY = 'bogleconvert_master_prices_cache';
 const MASTER_PRICE_TIMESTAMP_KEY = 'bogleconvert_master_prices_ts';
@@ -124,7 +124,7 @@ const fetchMasterPrices = async (): Promise<void> => {
     if (stored && ts) {
       const age = Date.now() - parseInt(ts, 10);
       if (age < CLIENT_CACHE_DURATION) {
-        MASTER_PRICE_CACHE = JSON.parse(stored) as Record<string, { price: number; last_pulled: string }>;
+        MASTER_PRICE_CACHE = JSON.parse(stored) as Record<string, { price: number }>;
         return;
       }
     }
@@ -139,12 +139,13 @@ const fetchMasterPrices = async (): Promise<void> => {
       if (!res.ok) throw new Error('Failed to fetch prices');
       const data = await res.json();
 
-      MASTER_PRICE_CACHE = data as Record<string, { price: number; last_pulled: string }>;
+      MASTER_PRICE_CACHE = data as Record<string, { price: number }>;
 
       // Save to Local Storage
       try {
         localStorage.setItem(MASTER_PRICE_STORAGE_KEY, JSON.stringify(data));
-        localStorage.setItem(MASTER_PRICE_TIMESTAMP_KEY, Date.now().toString());
+        const now = Date.now().toString();
+        localStorage.setItem(MASTER_PRICE_TIMESTAMP_KEY, now);
       } catch (e) { console.error("Cache write error", e); }
 
     } catch (e) {
@@ -249,14 +250,15 @@ export const fetchStockQuote = async (ticker: string): Promise<{ price: number; 
     sector: hash % 2 === 0 ? 'Technology' : 'Consumer'
   };
 
-  const lastUpdated = new Date().toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  });
+  // Determine Last Updated Display
+  // Use the global cache timestamp if available, otherwise current session time
+  let lastUpdated = '';
+  const cachedTS = localStorage.getItem(MASTER_PRICE_TIMESTAMP_KEY);
+  if (cachedTS) {
+    lastUpdated = new Date(parseInt(cachedTS, 10)).toLocaleString();
+  } else {
+    lastUpdated = new Date().toLocaleString();
+  }
 
   const result = {
     price: currentPrice,
@@ -324,10 +326,14 @@ export const getPortfolioData = async (): Promise<StockPosition[]> => {
         const hydratedPortfolio = parsed.map((position: StockPosition) => {
           const latestData = MASTER_PRICE_CACHE?.[position.ticker.toUpperCase()];
           if (latestData && latestData.price > 0) {
+            // Get global timestamp
+            const tsStr = localStorage.getItem(MASTER_PRICE_TIMESTAMP_KEY);
+            const ts = tsStr ? new Date(parseInt(tsStr, 10)).toLocaleString() : new Date().toLocaleString();
+
             return {
               ...position,
               currentPrice: latestData.price,
-              lastUpdated: latestData.last_pulled
+              lastUpdated: ts
             };
           }
           return position;

@@ -54,7 +54,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user }) =>
         <div className="rounded-lg bg-gradient-to-br from-amber-500/10 to-orange-600/10 p-4 text-center border border-amber-500/20">
           <div>
             <p className="text-sm font-medium text-white">Enjoying BogleConvert?</p>
-            <p className="mt-2 text-xs text-muted leading-relaxed">Your support keeps the servers running and the data flowing.</p>
+            <p className="mt-2 text-xs text-muted leading-relaxed">0% Expense Ratio.<br />Built for the community</p>
           </div>
           <button className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-white py-1.5 text-sm font-semibold text-black transition-all hover:bg-amber-50 hover:text-amber-900 group">
             <span className="material-symbols-outlined text-base group-hover:animate-bounce">local_cafe</span>

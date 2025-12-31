@@ -8,32 +8,37 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     try {
-        let masterPrices = await env.PRICES.get<Record<string, StockData>>('MASTER_PRICES', { type: 'json' });
+        // 1. Fetch current data and metadata
+        const { value: storedPrices, metadata } = await env.PRICES.getWithMetadata<Record<string, StockData>>(
+            "MASTER_PRICES",
+            { type: "json" }
+        );
+
+        let masterPrices = storedPrices;
         let needsRefresh = false;
+
+        const lastPulledStr = (metadata as { timestamp?: string })?.timestamp;
 
         if (!masterPrices) {
             needsRefresh = true;
-        } else {
-            // Check Freshness (e.g., is data older than 24 hours?)
-            // We check the first key's timestamp as a proxy for the whole set
-            const firstKey = Object.keys(masterPrices)[0];
-            if (firstKey && masterPrices[firstKey]?.last_pulled) {
-                const lastPulled = new Date(masterPrices[firstKey].last_pulled).getTime();
-                const now = new Date().getTime();
-                const hoursDiff = (now - lastPulled) / (1000 * 60 * 60);
+        } else if (lastPulledStr) {
+            const lastPulled = new Date(lastPulledStr).getTime();
+            const now = new Date().getTime();
+            const hoursDiff = (now - lastPulled) / (1000 * 60 * 60);
 
-                if (hoursDiff > 24) {
-                    needsRefresh = true;
-                }
-            } else {
+            if (hoursDiff > 24) {
                 needsRefresh = true;
             }
+        } else {
+            // If data exists but no metadata (legacy data), refresh to migrate structure
+            needsRefresh = true;
         }
 
+        // 2. Refresh if needed
         if (needsRefresh) {
             console.log("Data stale or missing. Triggering on-demand refresh...");
             const refreshResult = await fetchAndCachePrices(env);
-            if (refreshResult) {
+            if (refreshResult && refreshResult.prices) {
                 masterPrices = refreshResult.prices;
             }
         }
@@ -47,7 +52,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
             });
         }
 
-        // Return the data
+        // 3. Return the data
         return new Response(JSON.stringify(masterPrices), {
             headers: {
                 'Content-Type': 'application/json',

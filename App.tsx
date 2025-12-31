@@ -105,16 +105,18 @@ const App: React.FC = () => {
     initData();
   }, []);
 
-  // Recalculate chart data whenever portfolio changes
+  const [benchmark, setBenchmark] = useState<'VT' | 'VTI' | 'VOO'>('VT');
+
+  // Recalculate chart data whenever portfolio or benchmark changes
   useEffect(() => {
     const updateChart = async () => {
       if (!loading) {
-        const newChartData = await getChartData(portfolio);
+        const newChartData = await getChartData(portfolio, benchmark);
         setChartData(newChartData);
       }
     };
     updateChart();
-  }, [portfolio, loading]);
+  }, [portfolio, benchmark, loading]);
 
   const handleUpdateStock = (index: number, field: keyof StockPosition, value: string | number) => {
     setPortfolio(prevPortfolio => {
@@ -176,6 +178,10 @@ const App: React.FC = () => {
   const handleViewReport = (ticker: string) => {
     setReportTicker(ticker);
     handleViewChange(ViewState.REPORT);
+  };
+
+  const handleViewGuide = () => {
+    handleViewChange(ViewState.PHILOSOPHY);
   };
 
   const handleAddRow = () => {
@@ -300,6 +306,9 @@ const App: React.FC = () => {
             onAddRow={handleAddRow}
             onBulkImport={handleBulkImport}
             onLoadDemo={handleLoadDemo}
+            benchmark={benchmark}
+            onBenchmarkChange={setBenchmark}
+            onViewGuide={handleViewGuide}
           />
         );
       case ViewState.ANALYSIS:
@@ -340,6 +349,9 @@ const App: React.FC = () => {
             onAddRow={handleAddRow}
             onBulkImport={handleBulkImport}
             onLoadDemo={handleLoadDemo}
+            benchmark={benchmark}
+            onBenchmarkChange={setBenchmark}
+            onViewGuide={handleViewGuide}
           />
         );
     }
