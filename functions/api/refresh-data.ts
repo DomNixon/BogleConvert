@@ -27,13 +27,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     const csvText = await response.text();
+
+    // Validate we didn't get HTML (common user error with Google Sheets URLs)
+    if (csvText.trim().startsWith('<!DOCTYPE html') || csvText.includes('<html')) {
+      throw new Error('Received HTML instead of CSV. Check your SHEET_CSV_URL. It should end with "&output=csv" or similar, not "pubhtml".');
+    }
+
     const lines = csvText.split('\n');
     const prices: Record<string, StockData> = {};
     const timestamp = new Date().toISOString();
 
     // Skip header row if present (assuming first row is header)
     // CSV Expected Format: Ticker, Price, ...
-    const startIdx = 1; 
+    const startIdx = 1;
 
     for (let i = startIdx; i < lines.length; i++) {
       const line = lines[i].trim();

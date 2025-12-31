@@ -31,9 +31,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user }) =>
             <button
               key={item.id}
               onClick={() => onChangeView(item.id)}
-              className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                isActive ? 'text-white' : 'text-muted hover:bg-white/5 hover:text-white'
-              }`}
+              className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${isActive ? 'text-white' : 'text-muted hover:bg-white/5 hover:text-white'
+                }`}
             >
               {isActive && (
                 <>

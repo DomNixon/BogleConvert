@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:worker": "wrangler pages dev --kv PRICES --proxy 3000 -- npm run dev",
     "build": "vite build",
     "preview": "vite preview"
   },

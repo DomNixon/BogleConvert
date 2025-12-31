@@ -26,6 +26,7 @@ dist-ssr
 # Credentials
 .env
 .gitignore
+.dev.vars
 
 # AI Agents Rules and Workflow
 /Rules/

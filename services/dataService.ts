@@ -106,22 +106,51 @@ const VOO_ANNUAL_RETURNS: { year: number; return: number }[] = [
 ];
 
 // Helper: Current Real-World Prices (Approximated for Demo Context)
-// Master Price Cache (populated once per session)
+// Master Price Cache (populated once per session or from local storage)
 let MASTER_PRICE_CACHE: Record<string, { price: number; last_pulled: string }> | null = null;
 let FETCH_PROMISE: Promise<void> | null = null;
+const MASTER_PRICE_STORAGE_KEY = 'bogleconvert_master_prices_cache';
+const MASTER_PRICE_TIMESTAMP_KEY = 'bogleconvert_master_prices_ts';
+// Cache Duration: 4 hours (matching Worker Cache-Control) or 24h as preferred.
+// Logic: If user reloads page, we don't hit worker if data is fresh enough.
+const CLIENT_CACHE_DURATION = 4 * 60 * 60 * 1000;
 
 const fetchMasterPrices = async (): Promise<void> => {
   if (MASTER_PRICE_CACHE) return;
+
+  // 1. Try Local Storage
+  try {
+    const stored = localStorage.getItem(MASTER_PRICE_STORAGE_KEY);
+    const ts = localStorage.getItem(MASTER_PRICE_TIMESTAMP_KEY);
+    if (stored && ts) {
+      const age = Date.now() - parseInt(ts, 10);
+      if (age < CLIENT_CACHE_DURATION) {
+        MASTER_PRICE_CACHE = JSON.parse(stored) as Record<string, { price: number; last_pulled: string }>;
+        return;
+      }
+    }
+  } catch (e) { console.error("Cache read error", e); }
+
+  // 2. Fetch from Network if missing or stale
   if (FETCH_PROMISE) return FETCH_PROMISE;
 
   FETCH_PROMISE = (async () => {
     try {
       const res = await fetch('/api/batch-quote');
       if (!res.ok) throw new Error('Failed to fetch prices');
-      MASTER_PRICE_CACHE = await res.json();
+      const data = await res.json();
+
+      MASTER_PRICE_CACHE = data as Record<string, { price: number; last_pulled: string }>;
+
+      // Save to Local Storage
+      try {
+        localStorage.setItem(MASTER_PRICE_STORAGE_KEY, JSON.stringify(data));
+        localStorage.setItem(MASTER_PRICE_TIMESTAMP_KEY, Date.now().toString());
+      } catch (e) { console.error("Cache write error", e); }
+
     } catch (e) {
       console.error("Error fetching master prices:", e);
-      MASTER_PRICE_CACHE = {}; // Fallback to empty to prevent infinite loops
+      MASTER_PRICE_CACHE = {}; // Fallback
     } finally {
       FETCH_PROMISE = null;
     }
@@ -268,13 +297,31 @@ export const getCumulativeInflation = (yearsHeld: number): number => {
 export const getPortfolioData = async (): Promise<StockPosition[]> => {
   await new Promise(resolve => setTimeout(resolve, 600));
 
+  // Ensure we have master prices to hydrate valid data
+  if (!MASTER_PRICE_CACHE) {
+    await fetchMasterPrices();
+  }
+
   // Check local storage first
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // HYDRATE PRICES: Update stored portfolio with latest prices from API
+        const hydratedPortfolio = parsed.map((position: StockPosition) => {
+          const latestData = MASTER_PRICE_CACHE?.[position.ticker.toUpperCase()];
+          if (latestData && latestData.price > 0) {
+            return {
+              ...position,
+              currentPrice: latestData.price,
+              lastUpdated: latestData.last_pulled
+            };
+          }
+          return position;
+        });
+
+        return hydratedPortfolio;
       }
     }
   } catch (e) {
