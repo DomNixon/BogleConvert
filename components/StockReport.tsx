@@ -12,10 +12,10 @@ interface StockDisplayData {
     ticker: string;
     name: string;
     price: number;
-    change: number;
+    change?: number;
     rangeLow: number;
     rangeHigh: number;
-    marketAnnualReturn: number;
+    marketAnnualReturn?: number;
     lastUpdated: string;
     sector?: string;
 }
@@ -52,7 +52,7 @@ const StockReport: React.FC<StockReportProps> = ({ portfolio, initialTicker = "A
             realBuyingPower = Number(realCagr.toFixed(1));
         } else {
             // Use Market data fallback (Yearly Return)
-            annualGrowth = displayData.marketAnnualReturn;
+            annualGrowth = displayData.marketAnnualReturn || 10.0;
             // Approximate Real Power for generic market data
             // Real = ((1 + r) / (1 + i)) - 1
             const realRet = ((1 + (annualGrowth / 100)) / (1 + avgInflationRate) - 1) * 100;
@@ -83,7 +83,7 @@ const StockReport: React.FC<StockReportProps> = ({ portfolio, initialTicker = "A
                         change: quote.dailyChange,
                         rangeLow: Number((quote.price - (rangeSpread * 0.4)).toFixed(2)),
                         rangeHigh: Number((quote.price + (rangeSpread * 0.6)).toFixed(2)),
-                        marketAnnualReturn: quote.yearlyReturn || 10.0,
+                        marketAnnualReturn: quote.yearlyReturn,
                         lastUpdated: quote.lastUpdated,
                         sector: quote.sector
                     });
@@ -181,9 +181,13 @@ const StockReport: React.FC<StockReportProps> = ({ portfolio, initialTicker = "A
                                         <p className="text-muted text-sm font-medium leading-normal mb-2">Current Price</p>
                                         <div className="flex items-baseline justify-center gap-3">
                                             <p className="text-white tracking-light text-4xl font-bold font-display leading-tight">{CURRENCY_FORMATTER.format(displayData.price)}</p>
-                                            <p className={`${displayData.change >= 0 ? 'text-positive' : 'text-negative'} text-lg font-medium leading-normal`}>
-                                                {displayData.change > 0 ? '+' : ''}{displayData.change}%
-                                            </p>
+                                            {displayData.change !== undefined ? (
+                                                <p className={`${displayData.change >= 0 ? 'text-positive' : 'text-negative'} text-lg font-medium leading-normal`}>
+                                                    {displayData.change > 0 ? '+' : ''}{displayData.change}%
+                                                </p>
+                                            ) : (
+                                                <p className="text-muted text-lg font-medium leading-normal">--</p>
+                                            )}
                                         </div>
                                     </div>
                                     <div className={`w-full mt-2 pt-2 border-t border-white/10 flex items-center justify-center gap-2 ${showWarning ? 'text-orange-400' : 'text-muted'}`}>

@@ -62,6 +62,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user }) =>
           </button>
         </div>
 
+        {/*
         <div className="flex items-center gap-3 border-t border-outline pt-4">
           <img
             alt="User avatar"
@@ -73,6 +74,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user }) =>
             <p className="text-xs text-muted truncate w-full">{user.email}</p>
           </div>
         </div>
+        */}
       </div>
     </aside>
   );

@@ -18,6 +18,7 @@ interface DashboardProps {
     benchmark: 'VT' | 'VTI' | 'VOO';
     onBenchmarkChange: (b: 'VT' | 'VTI' | 'VOO') => void;
     onViewGuide: () => void;
+    lastUpdated?: string | null;
 }
 
 // Internal Memoized Chart Component
@@ -106,6 +107,12 @@ const DashboardChart = React.memo(({ chartData, benchmark }: { chartData: ChartD
                 <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full border border-dashed border-emerald-400"></div>
                     <p className="text-sm text-neutral-300">Inflation</p>
+                </div>
+                <div className="group relative flex items-center ml-2 cursor-help">
+                    <span className="material-symbols-outlined text-muted text-sm hover:text-white transition-colors">info</span>
+                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-64 p-3 bg-bg-dark border border-outline rounded-lg shadow-xl text-xs text-muted hidden group-hover:block z-50">
+                        This chart shows a simplified projection of your portfolio's growth based on your holdings' total return and the benchmark's historical annual returns. It implies a constant performance gap and does not represent actual historical price movements.
+                    </div>
                 </div>
             </div>
 
@@ -196,7 +203,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     onLoadDemo,
     benchmark,
     onBenchmarkChange,
-    onViewGuide
+    onViewGuide,
+    lastUpdated
 }) => {
     const [selectedStock, setSelectedStock] = useState<StockPosition | null>(null);
     const [dragActive, setDragActive] = useState(false);
@@ -316,7 +324,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                     <div className="flex items-center gap-2 mt-2">
                         <span className="material-symbols-outlined text-sm text-muted">cloud</span>
-                        <p className="text-xs text-muted">Market data updated daily via BogleConvert Cloud. Your portfolio data stays local.</p>
+                        <p className="text-xs text-muted">
+                            Market data updated daily via BogleConvert Cloud.
+                            {lastUpdated && <span className="text-secondary ml-1">Last Data Pull: {lastUpdated}</span>}
+                        </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">

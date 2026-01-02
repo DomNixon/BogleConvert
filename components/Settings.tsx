@@ -30,15 +30,23 @@ const Settings: React.FC<SettingsProps> = ({ user, portfolio, onUpdateProfile })
         });
 
         const csvString = csvRows.join('\n');
-        const blob = new Blob([csvString], { type: 'text/csv' });
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
         const url = window.URL.createObjectURL(blob);
+
         const a = document.createElement('a');
-        a.setAttribute('hidden', '');
-        a.setAttribute('href', url);
-        a.setAttribute('download', 'bogleconvert_portfolio.csv');
+        a.style.display = 'none';
+        a.href = url;
+        const date = new Date().toISOString().split('T')[0];
+        a.download = `BogleConvert_Portfolio_${date}.csv`;
+
         document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
+
+        // Cleanup
+        setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 100);
 
         setStatusMessage({ type: 'success', text: "Portfolio exported successfully." });
         setTimeout(() => setStatusMessage(null), 3000);
@@ -97,6 +105,7 @@ const Settings: React.FC<SettingsProps> = ({ user, portfolio, onUpdateProfile })
                     </div>
                 )}
 
+                {/*
                 <div className="rounded-xl border border-outline bg-surface p-6">
                     <h3 className="text-lg font-bold leading-tight tracking-[-0.015em] text-white">Profile Information</h3>
                     <p className="text-sm text-muted mt-1 mb-6">Update your personal details here.</p>
@@ -119,7 +128,9 @@ const Settings: React.FC<SettingsProps> = ({ user, portfolio, onUpdateProfile })
                         </label>
                     </div>
                 </div>
+                */}
 
+                {/*
                 <div className="rounded-xl border border-outline bg-surface p-6">
                     <h3 className="text-lg font-bold leading-tight tracking-[-0.015em] text-white">Change Password</h3>
                     <p className="text-sm text-muted mt-1 mb-6">For your security, we recommend using a strong, unique password.</p>
@@ -146,6 +157,7 @@ const Settings: React.FC<SettingsProps> = ({ user, portfolio, onUpdateProfile })
                         </label>
                     </div>
                 </div>
+                */}
 
                 <div className="rounded-xl border border-outline bg-surface p-6">
                     <h3 className="text-lg font-bold leading-tight tracking-[-0.015em] text-white">Data Management</h3>
@@ -194,6 +206,7 @@ const Settings: React.FC<SettingsProps> = ({ user, portfolio, onUpdateProfile })
         </div> 
         */}
 
+                {/*
                 <div className="flex justify-end gap-4 border-t border-outline pt-6">
                     <button
                         onClick={() => {
@@ -216,6 +229,7 @@ const Settings: React.FC<SettingsProps> = ({ user, portfolio, onUpdateProfile })
                         Save Changes
                     </button>
                 </div>
+                */}
             </div>
         </div>
     );

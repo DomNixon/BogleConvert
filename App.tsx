@@ -13,7 +13,9 @@ import {
   fetchStockQuote,
   getCumulativeInflation,
   DEMO_PORTFOLIO,
-  refreshMarketData
+  refreshMarketData,
+  getLastDataUpdate,
+  savePortfolio
 } from './services/dataService';
 
 const App: React.FC = () => {
@@ -23,6 +25,7 @@ const App: React.FC = () => {
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [reportTicker, setReportTicker] = useState<string>("AAPL");
+  const [lastDataUpdate, setLastDataUpdate] = useState<string | null>(null);
 
   // Helper to recalculate row stats
   const calculateStats = (stock: StockPosition) => {
@@ -47,8 +50,8 @@ const App: React.FC = () => {
       const cagr = (Math.pow(totalRatio, 1 / years) - 1) * 100;
       stock.cagr = Number(cagr.toFixed(1));
 
-      if (stock.inflationAdjReturn > 0) stock.status = 'Beating Inflation';
-      else if (stock.inflationAdjReturn > -5) stock.status = 'Tracking Market';
+      if (stock.inflationAdjReturn > 1) stock.status = 'Beating Inflation';
+      else if (stock.inflationAdjReturn >= -1) stock.status = 'Tracking Market';
       else stock.status = 'Losing Power';
     } else {
       stock.nominalReturn = 0;
@@ -57,6 +60,24 @@ const App: React.FC = () => {
       stock.cagr = 0;
     }
     return stock;
+  };
+
+  // Helper to recalculate portfolio weights based on current value
+  const recalculateWeights = (portfolioData: StockPosition[]): StockPosition[] => {
+    const totalValue = portfolioData.reduce((sum, stock) => {
+      const value = (stock.currentPrice || 0) * (stock.shares || 0);
+      return sum + value;
+    }, 0);
+
+    if (totalValue === 0) {
+      return portfolioData.map(stock => ({ ...stock, weight: 0 }));
+    }
+
+    return portfolioData.map(stock => {
+      const value = (stock.currentPrice || 0) * (stock.shares || 0);
+      const weight = (value / totalValue) * 100;
+      return { ...stock, weight: Number(weight.toFixed(1)) };
+    });
   };
 
   useEffect(() => {
@@ -89,11 +110,16 @@ const App: React.FC = () => {
           return stock;
         }));
 
-        setPortfolio(updatedPortfolio);
+        // Recalculate weights after all stats are computed
+        const portfolioWithWeights = recalculateWeights(updatedPortfolio);
+        setPortfolio(portfolioWithWeights);
 
         // Initial Chart Load
         const initialChartData = await getChartData(updatedPortfolio);
         setChartData(initialChartData);
+
+        // Get Timestamp
+        setLastDataUpdate(getLastDataUpdate());
 
       } catch (error) {
         console.error("Failed to load initial data", error);
@@ -118,6 +144,13 @@ const App: React.FC = () => {
     updateChart();
   }, [portfolio, benchmark, loading]);
 
+  // Auto-Save Portfolio to Local Storage
+  useEffect(() => {
+    if (!loading && portfolio.length > 0) {
+      savePortfolio(portfolio);
+    }
+  }, [portfolio, loading]);
+
   const handleUpdateStock = (index: number, field: keyof StockPosition, value: string | number) => {
     setPortfolio(prevPortfolio => {
       const newPortfolio = [...prevPortfolio];
@@ -135,6 +168,12 @@ const App: React.FC = () => {
       }
 
       newPortfolio[index] = stock;
+
+      // Recalculate weights if shares changed
+      if (field === 'shares') {
+        return recalculateWeights(newPortfolio);
+      }
+
       return newPortfolio;
     });
   };
@@ -156,7 +195,9 @@ const App: React.FC = () => {
           calculateStats(stock);
 
           newPortfolio[index] = stock;
-          return newPortfolio;
+
+          // Recalculate weights since currentPrice changed
+          return recalculateWeights(newPortfolio);
         });
       }
     } catch (e) {
@@ -165,7 +206,11 @@ const App: React.FC = () => {
   };
 
   const handleDeleteRow = (index: number) => {
-    setPortfolio(prev => prev.filter((_, i) => i !== index));
+    setPortfolio(prev => {
+      const filtered = prev.filter((_, i) => i !== index);
+      // Recalculate weights after deletion
+      return recalculateWeights(filtered);
+    });
   };
 
   // Wrapper for view navigation to handle cleanup
@@ -261,9 +306,12 @@ const App: React.FC = () => {
         }
       }
 
-      // Append new stocks to existing portfolio
+      // Append new stocks to existing portfolio and recalculate weights
       if (newStocks.length > 0) {
-        setPortfolio(prev => [...prev, ...newStocks]);
+        setPortfolio(prev => {
+          const combined = [...prev, ...newStocks];
+          return recalculateWeights(combined);
+        });
       }
     };
     reader.readAsText(file);
@@ -271,8 +319,10 @@ const App: React.FC = () => {
 
   const handleLoadDemo = () => {
     // Deep copy the demo portfolio to avoid reference issues
-    const demo = JSON.parse(JSON.stringify(DEMO_PORTFOLIO));
-    setPortfolio(demo);
+    const demo = JSON.parse(JSON.stringify(DEMO_PORTFOLIO)) as StockPosition[];
+    // Recalculate weights for demo data
+    const demoWithWeights = recalculateWeights(demo);
+    setPortfolio(demoWithWeights);
   };
 
   const handleUpdateProfile = (updates: Partial<UserProfile>) => {
@@ -309,6 +359,7 @@ const App: React.FC = () => {
             benchmark={benchmark}
             onBenchmarkChange={setBenchmark}
             onViewGuide={handleViewGuide}
+            lastUpdated={lastDataUpdate}
           />
         );
       case ViewState.ANALYSIS:

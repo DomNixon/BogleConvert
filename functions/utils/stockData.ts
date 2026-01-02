@@ -6,104 +6,118 @@ export interface Env {
 
 export interface StockData {
     price: number;
+    name?: string;
+    industry?: string;
+    sector?: string;
 }
 
 interface StockJsonItem {
     symbol: string;
+    name: string;
     lastsale: string;
+    industry?: string;
+    sector?: string;
 }
 
 export async function fetchAndCachePrices(env: Env): Promise<{ prices: Record<string, StockData>, source: string } | null> {
-    // 1. Try Primary Source (JSON) via Exchange_Stock_Data
-    try {
-        if (env.Exchange_Stock_Data) {
-            const response = await fetch(env.Exchange_Stock_Data);
-            if (response.ok) {
-                const jsonText = await response.text();
-                // Validation: Simple check if it looks like JSON
-                if (jsonText.trim().startsWith('[')) {
-                    const jsonData = JSON.parse(jsonText) as StockJsonItem[];
-                    const prices: Record<string, StockData> = {};
-                    
-                    for (const item of jsonData) {
-                        const ticker = item.symbol;
-                        // Remove '$' and parse
-                        const priceStr = item.lastsale.replace('$', '').trim();
-                        const price = parseFloat(priceStr);
+    const prices: Record<string, StockData> = {};
+    let jsonCount = 0;
+    let csvCount = 0;
 
-                        if (ticker && !isNaN(price)) {
-                            prices[ticker.toUpperCase()] = {
-                                price
-                            };
+    // 1. Parallel Fetch (Fail-safe)
+    const [jsonResult, csvResult] = await Promise.allSettled([
+        env.Exchange_Stock_Data ? fetch(env.Exchange_Stock_Data).then(res => res.ok ? res.text() : null) : Promise.resolve(null),
+        env.SHEET_CSV_URL ? fetch(env.SHEET_CSV_URL).then(res => res.ok ? res.text() : null) : Promise.resolve(null)
+    ]);
+
+    // 2. Process JSON (Primary - Rich Metadata)
+    if (jsonResult.status === 'fulfilled' && jsonResult.value) {
+        try {
+            const jsonText = jsonResult.value;
+            // Basic validation
+            if (jsonText.trim().startsWith('[')) {
+                const jsonData = JSON.parse(jsonText) as StockJsonItem[];
+
+                for (let i = 0, len = jsonData.length; i < len; i++) {
+                    const item = jsonData[i];
+                    // Skip if symbol is missing
+                    if (!item.symbol) continue;
+
+                    const ticker = item.symbol.trim().toUpperCase();
+                    if (!ticker) continue;
+
+                    // Lightweight parse: Remove '$' and ','
+                    const priceStr = item.lastsale.replace(/[$,]/g, '');
+                    const price = parseFloat(priceStr);
+
+                    if (!isNaN(price)) {
+                        prices[ticker] = {
+                            price,
+                            name: item.name ? item.name.trim() : undefined,
+                            industry: item.industry ? item.industry.trim() : undefined,
+                            sector: item.sector ? item.sector.trim() : undefined
+                        };
+                        jsonCount++;
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Error parsing JSON source:", e);
+        }
+    }
+
+    // 3. Process CSV (Fallback/Supplement)
+    // "The Google Sheet will start at 250 entries and will likely grow to about 1,000"
+    // Optimization: Standard split is fine for 1000 lines.
+    if (csvResult.status === 'fulfilled' && csvResult.value) {
+        try {
+            const csvText = csvResult.value;
+            // Validate it's not HTML error page
+            if (!csvText.trim().startsWith('<!DOCTYPE html') && !csvText.includes('<html')) {
+                const lines = csvText.split('\n');
+
+                // Start at 1 to skip header
+                for (let i = 1, len = lines.length; i < len; i++) {
+                    const line = lines[i];
+                    if (!line) continue;
+
+                    // optimization: use indexOf to find split point instead of full split if simple
+                    // But CSV might have quoted fields. Assuming simple "Symbol, Price" format for now based on previous code.
+                    const parts = line.split(',');
+
+                    if (parts.length >= 2) {
+                        const ticker = parts[0].trim().toUpperCase();
+
+                        // ONLY add if not already present from JSON (JSON is master)
+                        if (ticker && !prices[ticker]) {
+                            const priceStr = parts[1].trim();
+                            const price = parseFloat(priceStr);
+
+                            if (!isNaN(price)) {
+                                prices[ticker] = { price };
+                                csvCount++;
+                            }
                         }
                     }
-
-                    if (Object.keys(prices).length > 0) {
-                        // Store with Metadata for freshness tracking
-                        await env.PRICES.put('MASTER_PRICES', JSON.stringify(prices), {
-                            metadata: { timestamp: new Date().toISOString() }
-                        });
-                        return { prices, source: 'JSON' };
-                    }
-                }
-            } else {
-                console.warn(`Primary JSON fetch failed: ${response.status}`);
-            }
-        }
-    } catch (e) {
-        console.error("Primary JSON source failed, falling back...", e);
-    }
-
-    // 2. Fallback Source (Google Sheet CSV)
-    if (!env.SHEET_CSV_URL) {
-        console.error('Missing SHEET_CSV_URL environment variable for fallback');
-        return null;
-    }
-
-    try {
-        const response = await fetch(env.SHEET_CSV_URL);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch CSV: ${response.statusText}`);
-        }
-
-        const csvText = await response.text();
-
-        // Validate we didn't get HTML
-        if (csvText.trim().startsWith('<!DOCTYPE html') || csvText.includes('<html')) {
-            throw new Error('Received HTML instead of CSV.');
-        }
-
-        const lines = csvText.split('\n');
-        const prices: Record<string, StockData> = {};
-        const startIdx = 1;
-
-        for (let i = startIdx; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (!line) continue;
-
-            const parts = line.split(',');
-            if (parts.length >= 2) {
-                const ticker = parts[0].trim().toUpperCase();
-                const priceStr = parts[1].trim();
-                const price = parseFloat(priceStr);
-
-                if (ticker && !isNaN(price)) {
-                    prices[ticker] = {
-                        price
-                    };
                 }
             }
+        } catch (e) {
+            console.error("Error parsing CSV source:", e);
         }
+    }
 
-        if (Object.keys(prices).length > 0) {
-            await env.PRICES.put('MASTER_PRICES', JSON.stringify(prices), {
-                metadata: { timestamp: new Date().toISOString() }
-            });
-            return { prices, source: 'CSV_Fallback' };
-        }
+    const totalCount = jsonCount + csvCount;
+    if (totalCount > 0) {
+        const sourceMeta = `JSON:${jsonCount},CSV:${csvCount}`;
+        console.log(`Merged prices cache update. Sub-sources: ${sourceMeta}`);
 
-    } catch (err) {
-        console.error("Fallback CSV source failed", err);
+        await env.PRICES.put('MASTER_PRICES', JSON.stringify(prices), {
+            metadata: {
+                timestamp: new Date().toISOString(),
+                stats: sourceMeta
+            }
+        });
+        return { prices, source: 'merged' };
     }
 
     return null;

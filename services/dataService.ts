@@ -106,10 +106,14 @@ const VOO_ANNUAL_RETURNS: { year: number; return: number }[] = [
 ];
 
 // Master Price Cache (populated once per session or from local storage)
-let MASTER_PRICE_CACHE: Record<string, { price: number }> | null = null;
+let MASTER_PRICE_CACHE: Record<string, { price: number; name?: string; sector?: string; industry?: string }> | null = null;
 let FETCH_PROMISE: Promise<void> | null = null;
 const MASTER_PRICE_STORAGE_KEY = 'bogleconvert_master_prices_cache';
 const MASTER_PRICE_TIMESTAMP_KEY = 'bogleconvert_master_prices_ts';
+const MASTER_PRICE_VERSION_KEY = 'bogleconvert_cache_version';
+// Increment this to force all clients to drop their cache and re-fetch
+const CACHE_VERSION = 'v2_rich_data';
+
 // Cache Duration: 4 hours (matching Worker Cache-Control) or 24h as preferred.
 // Logic: If user reloads page, we don't hit worker if data is fresh enough.
 const CLIENT_CACHE_DURATION = 4 * 60 * 60 * 1000;
@@ -121,10 +125,13 @@ const fetchMasterPrices = async (): Promise<void> => {
   try {
     const stored = localStorage.getItem(MASTER_PRICE_STORAGE_KEY);
     const ts = localStorage.getItem(MASTER_PRICE_TIMESTAMP_KEY);
-    if (stored && ts) {
+    const version = localStorage.getItem(MASTER_PRICE_VERSION_KEY);
+
+    // Version Check: If version mismatch, ignore stored data to force refresh
+    if (stored && ts && version === CACHE_VERSION) {
       const age = Date.now() - parseInt(ts, 10);
       if (age < CLIENT_CACHE_DURATION) {
-        MASTER_PRICE_CACHE = JSON.parse(stored) as Record<string, { price: number }>;
+        MASTER_PRICE_CACHE = JSON.parse(stored) as Record<string, { price: number; name?: string; sector?: string; industry?: string }>;
         return;
       }
     }
@@ -135,17 +142,20 @@ const fetchMasterPrices = async (): Promise<void> => {
 
   FETCH_PROMISE = (async () => {
     try {
-      const res = await fetch('/api/batch-quote');
+      // Append version to URL to bypass browser HTTP cache and ensure we get the
+      // new data structure corresponding to this version.
+      const res = await fetch(`/api/batch-quote?v=${CACHE_VERSION}`);
       if (!res.ok) throw new Error('Failed to fetch prices');
       const data = await res.json();
 
-      MASTER_PRICE_CACHE = data as Record<string, { price: number }>;
+      MASTER_PRICE_CACHE = data as Record<string, { price: number; name?: string; sector?: string; industry?: string }>;
 
-      // Save to Local Storage
+      // Save to Local Storage with Version
       try {
         localStorage.setItem(MASTER_PRICE_STORAGE_KEY, JSON.stringify(data));
         const now = Date.now().toString();
         localStorage.setItem(MASTER_PRICE_TIMESTAMP_KEY, now);
+        localStorage.setItem(MASTER_PRICE_VERSION_KEY, CACHE_VERSION);
       } catch (e) { console.error("Cache write error", e); }
 
     } catch (e) {
@@ -157,6 +167,12 @@ const fetchMasterPrices = async (): Promise<void> => {
   })();
 
   return FETCH_PROMISE;
+};
+
+export const getLastDataUpdate = (): string | null => {
+  const tsStr = localStorage.getItem(MASTER_PRICE_TIMESTAMP_KEY);
+  if (!tsStr) return null;
+  return new Date(parseInt(tsStr, 10)).toLocaleString();
 };
 
 export const getUserProfile = async (): Promise<UserProfile> => {
@@ -180,7 +196,7 @@ export const refreshMarketData = async (): Promise<void> => {
   }
 };
 
-export const fetchStockQuote = async (ticker: string): Promise<{ price: number; name: string; sector: string; dailyChange: number; yearlyReturn: number; lastUpdated: string } | null> => {
+export const fetchStockQuote = async (ticker: string): Promise<{ price: number; name: string; sector: string; lastUpdated: string; dailyChange?: number; yearlyReturn?: number } | null> => {
   if (!ticker) return null;
   const t = ticker.toUpperCase();
   // Hash for data consistency on unknown tickers (used for mock sector/name generation)
@@ -199,23 +215,16 @@ export const fetchStockQuote = async (ticker: string): Promise<{ price: number; 
   }
 
   // Use Known Real Price if available
-  // If not in cache, we fall back to a "safe" 0 or handling it gracefully in UI
   const priceData = MASTER_PRICE_CACHE?.[t];
   let currentPrice = priceData?.price || 0;
+  let name = priceData?.name || '';
+  let sector = priceData?.sector || '';
 
   if (currentPrice === 0) {
-    // Fallback: If absolutely no data, maybe use hash for purely visual demo purposes 
-    // OR prefer returning 0 to indicate "Not Found"
-    // Per rules, we should avoid "Mock Data", so 0 is safer or let user know.
-    // However, to keep the app usable if the sheet is empty, we might warn.
     console.warn(`No price found for ${t}`);
   }
 
-  const change = (hash % 2 === 0 ? 1 : -1) * (Math.random() * 5);
-
-  // Mock yearly return -20% to +30%
-  const yearlyReturn = ((hash % 50) - 20) + (Math.random() * 5);
-
+  // Fallback to Known Data if API didn't provide name/sector
   const knownData: { [key: string]: { name: string, sector: string } } = {
     'AAPL': { name: 'Apple Inc.', sector: 'Technology' },
     'NVDA': { name: 'NVIDIA Corp', sector: 'Technology' },
@@ -245,10 +254,14 @@ export const fetchStockQuote = async (ticker: string): Promise<{ price: number; 
     'BRK.B': { name: 'Berkshire Hathaway', sector: 'Financials' },
   };
 
-  const info = knownData[t] || {
-    name: `${t} Inc.`,
-    sector: hash % 2 === 0 ? 'Technology' : 'Consumer'
-  };
+  if (!name || !sector) {
+    const info = knownData[t] || {
+      name: `${t} Inc.`,
+      sector: hash % 2 === 0 ? 'Technology' : 'Consumer'
+    };
+    if (!name) name = info.name;
+    if (!sector) sector = info.sector;
+  }
 
   // Determine Last Updated Display
   // Use the global cache timestamp if available, otherwise current session time
@@ -262,10 +275,10 @@ export const fetchStockQuote = async (ticker: string): Promise<{ price: number; 
 
   const result = {
     price: currentPrice,
-    name: info.name,
-    sector: info.sector,
-    dailyChange: parseFloat(change.toFixed(2)),
-    yearlyReturn: parseFloat(yearlyReturn.toFixed(1)),
+    name: name,
+    sector: sector,
+    // dailyChange: parseFloat(change.toFixed(2)),
+    // yearlyReturn: parseFloat(yearlyReturn.toFixed(1)),
     lastUpdated
   };
 
@@ -350,6 +363,8 @@ export const getPortfolioData = async (): Promise<StockPosition[]> => {
   return [];
 };
 
+// Demo portfolio for new users to explore the tool
+// NOTE: Weight values are placeholders - they are recalculated on load based on actual values
 export const DEMO_PORTFOLIO: StockPosition[] = [
   {
     ticker: "AAPL",
@@ -416,7 +431,7 @@ export const DEMO_PORTFOLIO: StockPosition[] = [
     yearsHeld: 2.5,
     nominalReturn: 8.3,
     inflationAdjReturn: 5.0,
-    status: "Tracking Market",
+    status: "Beating Inflation",
     sector: "Consumer Discretionary",
     weight: 8.0,
     cagr: 18.5
@@ -444,7 +459,7 @@ export const DEMO_PORTFOLIO: StockPosition[] = [
     yearsHeld: 3,
     nominalReturn: 10.0,
     inflationAdjReturn: 6.5,
-    status: "Tracking Market",
+    status: "Beating Inflation",
     sector: "Financials",
     weight: 4.0,
     cagr: 12.0

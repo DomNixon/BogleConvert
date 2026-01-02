@@ -55,11 +55,109 @@ const HelpAbout: React.FC = () => {
                                 <span><span style={{ color: '#4ade80' }} className="font-bold">The Green Dotted Line (Inflation):</span> This is the "purchasing power" baseline.</span>
                             </li>
                         </ul>
-                        <div className="mt-4 pt-4 border-t border-white/10">
-                            <p className="text-gray-300">
-                                If your line turns <span style={{ color: '#a855f7' }} className="font-bold">Purple</span>: Your investment is currently losing purchasing power (lagging behind inflation).
-                            </p>
+                        <div className="mt-4 pt-4 border-t border-white/10 space-y-2">
+                            <p className="text-gray-300 font-medium">What the status labels mean:</p>
+                            <ul className="space-y-2 text-sm text-gray-400">
+                                <li>
+                                    <span style={{ color: '#4ade80' }} className="font-bold">Beating Inflation:</span> Real Return &gt; 1%. You are gaining purchasing power.
+                                </li>
+                                <li>
+                                    <span className="text-gray-400 font-bold">Tracking Market:</span> Real Return between -1% and 1%. You are preserving wealth but not significantly outperforming.
+                                    <span className="block text-xs text-muted mt-0.5 ml-2">Note: This does NOT mean your stock is tracking a market index. It means your real return is close to zero.</span>
+                                </li>
+                                <li>
+                                    <span style={{ color: '#a855f7' }} className="font-bold">Losing Power:</span> Real Return &lt; -1%. Your investment is lagging behind inflation.
+                                </li>
+                            </ul>
                         </div>
+                    </div>
+                </section>
+
+                <section className="space-y-6">
+                    <h2 className="text-2xl font-bold font-display text-white">Understanding Your Returns</h2>
+                    <div className="bg-surface rounded-xl border border-outline p-6 space-y-6">
+                        {/* 1. Nominal Return */}
+                        <div className="space-y-2">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                1. Nominal Return (%)
+                            </h3>
+                            <p className="text-gray-300">The raw percentage gain or loss on your investment.</p>
+                            <div className="bg-bg-dark p-3 rounded-lg font-mono text-sm text-secondary">
+                                (Current Price - Avg Cost) / Avg Cost × 100
+                            </div>
+                            <p className="text-sm text-muted">Example: You bought at $100. It's now $110. Nominal Return = 10%.</p>
+                            <p className="text-sm text-negative font-medium">Caveat: This does NOT account for inflation.</p>
+                        </div>
+
+                        <hr className="border-white/10" />
+
+                        {/* 2. Real Return */}
+                        <div className="space-y-2">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                2. Real Return (Inflation-Adjusted %)
+                            </h3>
+                            <p className="text-gray-300">Your gain in actual purchasing power. This is the "Truth" BogleConvert reveals.</p>
+                            <div className="bg-bg-dark p-3 rounded-lg font-mono text-sm text-secondary">
+                                ((1 + Nominal) / (1 + Cumulative Inflation)) - 1
+                            </div>
+                            <p className="text-sm text-muted">Example: Your 10% nominal gain occurred while inflation was 5%. Your Real Return is roughly 4.7%.</p>
+                            <p className="text-sm text-amber-400 font-medium">Why it matters: Calculated using historical CPI data for your specific holding period.</p>
+                        </div>
+
+                        <hr className="border-white/10" />
+
+                        {/* 3. CAGR */}
+                        <div className="space-y-2">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                3. CAGR (Compound Annual Growth Rate %)
+                            </h3>
+                            <p className="text-gray-300">The smoother annualized growth rate.</p>
+                            <div className="bg-bg-dark p-3 rounded-lg font-mono text-sm text-secondary">
+                                (End Value / Start Value)^(1 / Years) - 1
+                            </div>
+                            <p className="text-sm text-muted">Use case: Best for comparing investments held for different lengths of time.</p>
+                        </div>
+                    </div>
+
+                    {/* Quick Reference Table */}
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left text-gray-300 bg-surface rounded-xl border border-outline">
+                            <thead className="text-xs uppercase bg-white/5 text-white">
+                                <tr>
+                                    <th className="px-6 py-3">Metric</th>
+                                    <th className="px-6 py-3">Uses Time?</th>
+                                    <th className="px-6 py-3">Uses Inflation?</th>
+                                    <th className="px-6 py-3">Best For</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr className="border-b border-white/5">
+                                    <td className="px-6 py-4 font-medium text-white">Nominal</td>
+                                    <td className="px-6 py-4">No</td>
+                                    <td className="px-6 py-4">No</td>
+                                    <td className="px-6 py-4">Quick "app check"</td>
+                                </tr>
+                                <tr className="border-b border-white/5">
+                                    <td className="px-6 py-4 font-medium text-white">Real Return</td>
+                                    <td className="px-6 py-4">Yes (Inflation)</td>
+                                    <td className="px-6 py-4">Yes</td>
+                                    <td className="px-6 py-4">Actual wealth</td>
+                                </tr>
+                                <tr>
+                                    <td className="px-6 py-4 font-medium text-white">CAGR</td>
+                                    <td className="px-6 py-4">Yes</td>
+                                    <td className="px-6 py-4">No</td>
+                                    <td className="px-6 py-4">Comparison</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="bg-secondary/10 border border-secondary/20 rounded-xl p-5 flex items-center gap-3">
+                        <span className="material-symbols-outlined text-secondary">tips_and_updates</span>
+                        <p className="text-sm text-secondary">
+                            <strong className="text-white">Tip:</strong> A good investment beats inflation AND the benchmark.
+                        </p>
                     </div>
                 </section>
 
@@ -165,6 +263,9 @@ const HelpAbout: React.FC = () => {
                             <li><strong className="text-white">No Recommendations:</strong> A "Purple" or "Unhealthy" score is not a recommendation to sell. A "Blue" or "Healthy" score is not a recommendation to buy. All investment decisions should be made based on your own risk tolerance and financial situation.</li>
                             <li><strong className="text-white">Market Risk:</strong> Past performance of any security or benchmark (like VT) is not indicative of future results. All investing involves risk, including the possible loss of principal.</li>
                             <li><strong className="text-white">Accuracy:</strong> While we strive to use accurate market data, we cannot guarantee the timeliness or accuracy of stock prices, inflation data, or benchmark returns.</li>
+                            <li><strong className="text-white">Price Return Only:</strong> This tool measures price return only. Dividends are not included. High-dividend stocks may appear to underperform their actual total return.</li>
+                            <li><strong className="text-white">Approximate Inflation:</strong> Inflation data is approximate and based on historical CPI-U annual averages. For precise calculations, consult official BLS data.</li>
+                            <li><strong className="text-white">Chart Projection:</strong> The portfolio chart shows a simplified projection based on your holdings' implied return vs the benchmark. It does not represent actual historical price movements.</li>
                         </ul>
                     </div>
                 </section>
