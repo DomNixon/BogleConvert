@@ -35,5 +35,6 @@ export enum ViewState {
   ANALYSIS = 'analysis',
   SETTINGS = 'settings',
   REPORT = 'report', // The stock detail view
-  PHILOSOPHY = 'philosophy'
+  PHILOSOPHY = 'philosophy',
+  SUPPORT = 'support'
 }

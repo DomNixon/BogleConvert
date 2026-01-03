@@ -1,23 +1,61 @@
 import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import fs from 'fs';
 
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
-    return {
-      server: {
-        port: 3000,
-        host: '0.0.0.0',
-      },
-      plugins: [react()],
-      define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-      },
-      resolve: {
-        alias: {
-          '@': path.resolve(__dirname, '.'),
+  // Load standard Vite env files (.env, .env.local, etc.)
+  const env = loadEnv(mode, '.', '');
+
+  // Manually load .dev.vars for Cloudflare Workers compatibility
+  const devVarsPath = path.resolve(__dirname, '.dev.vars');
+  if (fs.existsSync(devVarsPath)) {
+    const devVarsContent = fs.readFileSync(devVarsPath, 'utf-8');
+    const lines = devVarsContent.split('\n');
+
+    lines.forEach(line => {
+      const trimmedLine = line.trim();
+      // Skip empty lines and comments
+      if (!trimmedLine || trimmedLine.startsWith('#')) return;
+
+      // Parse KEY=VALUE format
+      const equalIndex = trimmedLine.indexOf('=');
+      if (equalIndex > 0) {
+        const key = trimmedLine.substring(0, equalIndex).trim();
+        let value = trimmedLine.substring(equalIndex + 1).trim();
+
+        // Remove surrounding quotes if present
+        if ((value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1);
+        }
+
+        // Only add if not already in env (standard .env files take precedence)
+        if (!env[key]) {
+          env[key] = value;
         }
       }
-    };
+    });
+  }
+
+  return {
+    server: {
+      port: 3000,
+      host: '0.0.0.0',
+    },
+    plugins: [react()],
+    define: {
+      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'import.meta.env.VITE_STRIPE_URL': JSON.stringify(env.VITE_STRIPE_URL),
+      'import.meta.env.VITE_BTC_EMAIL': JSON.stringify(env.VITE_BTC_EMAIL),
+      'import.meta.env.VITE_GITHUB_REPO': JSON.stringify(env.VITE_GITHUB_REPO),
+      'import.meta.env.VITE_TURNSTILE_SITE_KEY': JSON.stringify(env.VITE_TURNSTILE_SITE_KEY),
+    },
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, '.'),
+      }
+    }
+  };
 });

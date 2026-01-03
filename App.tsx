@@ -5,6 +5,7 @@ import PortfolioAnalysis from './components/PortfolioAnalysis';
 import Settings from './components/Settings';
 import StockReport from './components/StockReport';
 import HelpAbout from './components/HelpAbout';
+import SupportPage from './components/SupportPage';
 import { ViewState, UserProfile, StockPosition, ChartDataPoint } from './types';
 import {
   getUserProfile,
@@ -29,6 +30,11 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [reportTicker, setReportTicker] = useState<string>("AAPL");
   const [lastDataUpdate, setLastDataUpdate] = useState<string | null>(null);
+
+  // Import progress tracking
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [importError, setImportError] = useState<string | null>(null);
 
 
 
@@ -240,6 +246,9 @@ const App: React.FC = () => {
       const text = e.target?.result as string;
       if (!text) return;
 
+      setImporting(true);
+      setImportError(null);
+
       const rows = text.split('\n');
       const rawStocks: StockPosition[] = [];
 
@@ -251,59 +260,76 @@ const App: React.FC = () => {
 
       // Skip header if present
       const startIdx = rows[0].toLowerCase().includes('ticker') ? 1 : 0;
+      const validRows: Array<{ ticker: string; avgCost: number; shares: number; yearsHeld: number }> = [];
 
+      // Parse all rows first
       for (let i = startIdx; i < rows.length; i++) {
         const row = rows[i].split(',').map(cell => cell.trim());
-
-        // Basic validation: Must have ticker and at least one data column
         if (row.length < 2 || !row[0]) continue;
 
         const ticker = row[0].toUpperCase();
-        // Safe access with fallbacks
         const avgCost = row[1] ? cleanNumber(row[1]) : 0;
         const shares = row[2] ? cleanNumber(row[2]) : 0;
         const yearsHeld = row[3] ? cleanNumber(row[3]) : 0;
 
-        // Fetch current data
-        let currentPrice = 0;
-        let name = '';
-        let sector = '';
-        let lastUpdated = '';
+        validRows.push({ ticker, avgCost, shares, yearsHeld });
+      }
 
-        try {
-          const quote = await fetchStockQuote(ticker);
-          if (quote) {
-            currentPrice = quote.price;
-            name = quote.name;
-            sector = quote.sector;
-            lastUpdated = quote.lastUpdated;
-          }
-        } catch (err) {
-          console.warn(`Could not fetch data for imported ticker ${ticker}`);
-        }
+      setImportProgress({ current: 0, total: validRows.length });
 
-        let stock: StockPosition = {
-          ticker,
-          name,
-          avgCost,
-          currentPrice,
-          shares,
-          yearsHeld,
-          nominalReturn: 0,
-          inflationAdjReturn: 0,
-          status: 'Tracking Market',
-          sector: sector || 'Unknown',
-          weight: 0,
-          cagr: 0,
-          lastUpdated
-        };
+      // Batch fetch quotes (10 at a time to avoid overwhelming the API)
+      const BATCH_SIZE = 10;
+      let successCount = 0;
+      let failCount = 0;
 
-        stock = calculateStats(stock);
-        rawStocks.push(stock);
+      for (let i = 0; i < validRows.length; i += BATCH_SIZE) {
+        const batch = validRows.slice(i, i + BATCH_SIZE);
+
+        const batchResults = await Promise.all(
+          batch.map(async (row) => {
+            try {
+              const quote = await fetchStockQuote(row.ticker);
+
+              let stock: StockPosition = {
+                ticker: row.ticker,
+                name: quote?.name || row.ticker,
+                avgCost: row.avgCost,
+                currentPrice: quote?.price || 0,
+                shares: row.shares,
+                yearsHeld: row.yearsHeld,
+                nominalReturn: 0,
+                inflationAdjReturn: 0,
+                status: 'Tracking Market',
+                sector: quote?.sector || 'Unknown',
+                weight: 0,
+                cagr: 0,
+                lastUpdated: quote?.lastUpdated || new Date().toLocaleString()
+              };
+
+              stock = calculateStats(stock);
+              successCount++;
+              return stock;
+            } catch (err) {
+              console.warn(`Could not fetch data for imported ticker ${row.ticker}`, err);
+              failCount++;
+              return null;
+            }
+          })
+        );
+
+        // Filter out failed fetches and add successful ones
+        rawStocks.push(...batchResults.filter((s): s is StockPosition => s !== null));
+
+        // Update progress
+        setImportProgress({ current: Math.min(i + BATCH_SIZE, validRows.length), total: validRows.length });
+      }
+
+      // Show error summary if any failed
+      if (failCount > 0) {
+        setImportError(`Successfully imported ${successCount} of ${validRows.length} tickers. ${failCount} failed.`);
       }
 
       // 1. Consolidate the *imported* list first (handle duplicates within the CSV)
-      // We pass [] as initial to mergePortfolios to effectively just self-merge the list
       const consolidatedImports = mergePortfolios([], rawStocks);
 
       // 2. Merge consolidated imports into main portfolio
@@ -313,6 +339,14 @@ const App: React.FC = () => {
           return recalculateWeights(merged);
         });
       }
+
+      setImporting(false);
+
+      // Clear progress after 3 seconds
+      setTimeout(() => {
+        setImportProgress({ current: 0, total: 0 });
+        setImportError(null);
+      }, 3000);
     };
     reader.readAsText(file);
   };
@@ -329,6 +363,27 @@ const App: React.FC = () => {
     if (user) {
       setUser({ ...user, ...updates });
     }
+  };
+
+  const handleUpdateRow = (index: number, data: Partial<StockPosition>) => {
+    setPortfolio(prev => {
+      const newPortfolio = [...prev];
+      const stock = { ...newPortfolio[index], ...data };
+
+      // Recalculate stats if financial fields changed
+      if ('avgCost' in data || 'yearsHeld' in data || 'currentPrice' in data) {
+        Object.assign(stock, calculateStats(stock));
+      }
+
+      newPortfolio[index] = stock;
+
+      // Recalculate weights if shares changed
+      if ('shares' in data) {
+        return recalculateWeights(newPortfolio);
+      }
+
+      return newPortfolio;
+    });
   };
 
   if (loading || !user) {
@@ -350,6 +405,7 @@ const App: React.FC = () => {
             portfolio={portfolio}
             chartData={chartData}
             onUpdateStock={handleUpdateStock}
+            onUpdateRow={handleUpdateRow}
             onTickerBlur={handleTickerBlur}
             onDeleteRow={handleDeleteRow}
             onViewReport={handleViewReport}
@@ -360,6 +416,9 @@ const App: React.FC = () => {
             onBenchmarkChange={setBenchmark}
             onViewGuide={handleViewGuide}
             lastUpdated={lastDataUpdate}
+            importing={importing}
+            importProgress={importProgress}
+            importError={importError}
           />
         );
       case ViewState.ANALYSIS:
@@ -388,12 +447,17 @@ const App: React.FC = () => {
         return (
           <HelpAbout />
         );
+      case ViewState.SUPPORT:
+        return (
+          <SupportPage />
+        );
       default:
         return (
           <Dashboard
             portfolio={portfolio}
             chartData={chartData}
             onUpdateStock={handleUpdateStock}
+            onUpdateRow={handleUpdateRow}
             onTickerBlur={handleTickerBlur}
             onDeleteRow={handleDeleteRow}
             onViewReport={handleViewReport}
@@ -403,6 +467,9 @@ const App: React.FC = () => {
             benchmark={benchmark}
             onBenchmarkChange={setBenchmark}
             onViewGuide={handleViewGuide}
+            importing={importing}
+            importProgress={importProgress}
+            importError={importError}
           />
         );
     }

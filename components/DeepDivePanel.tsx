@@ -21,7 +21,8 @@ const DeepDivePanel: React.FC<DeepDivePanelProps> = ({ stock, onClose, onViewRep
   // stock.inflationAdjReturn is the TOTAL real return over the holding period.
   // We need to annualize it to match the label "Real Annual Growth"
   const years = Math.max(stock.yearsHeld, 1);
-  const realAnnualGrowth = ((Math.pow((1 + (stock.inflationAdjReturn / 100)), (1 / years))) - 1) * 100;
+  const totalRealReturn = stock.inflationAdjReturn / 100; // Convert percentage to decimal
+  const realAnnualGrowth = (Math.pow(1 + totalRealReturn, 1 / years) - 1) * 100;
 
   return (
     <aside className="w-full lg:w-[380px] flex-shrink-0 bg-surface border border-outline lg:rounded-xl p-6 flex flex-col gap-6 h-fit animate-in slide-in-from-right duration-300">

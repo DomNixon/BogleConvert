@@ -1,5 +1,15 @@
 import { StockPosition, ChartDataPoint, UserProfile } from '../types';
 
+// Type for stock quote data returned from API
+export type StockQuote = {
+  price: number;
+  name: string;
+  sector: string;
+  lastUpdated: string;
+  dailyChange?: number;
+  yearlyReturn?: number;
+};
+
 /**
  * Helper to recalculate row stats
  */
@@ -25,7 +35,7 @@ export const calculateStats = (stock: StockPosition): StockPosition => {
     const cagr = (Math.pow(totalRatio, 1 / years) - 1) * 100;
     stock.cagr = Number(cagr.toFixed(1));
 
-    if (stock.inflationAdjReturn > 1) stock.status = 'Beating Inflation';
+    if (stock.inflationAdjReturn >= 1) stock.status = 'Beating Inflation';
     else if (stock.inflationAdjReturn >= -1) stock.status = 'Tracking Market';
     else stock.status = 'Losing Power';
   } else {
@@ -121,14 +131,26 @@ export const mergePortfolios = (current: StockPosition[], incoming: StockPositio
 const STORAGE_KEY = 'bogleconvert_portfolio';
 
 // Simple in-memory cache to prevent redundant fetches/calculations in a session
-const QUOTE_CACHE: Map<string, { data: any; timestamp: number }> = new Map();
+const QUOTE_CACHE: Map<string, { data: StockQuote; timestamp: number }> = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export const savePortfolio = (portfolio: StockPosition[]): void => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(portfolio));
+    const data = JSON.stringify(portfolio);
+    localStorage.setItem(STORAGE_KEY, data);
   } catch (e) {
-    console.error("Failed to save portfolio to local storage", e);
+    if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22)) {
+      console.error('LocalStorage quota exceeded. Portfolio size:', JSON.stringify(portfolio).length, 'bytes');
+
+      // Show user-friendly error
+      alert(
+        'Portfolio data exceeds storage limit.\n\n' +
+        'Your portfolio is too large to save automatically.\n' +
+        'Please export your portfolio to CSV from Settings to back up your data.'
+      );
+    } else {
+      console.error("Failed to save portfolio to local storage", e);
+    }
   }
 };
 
@@ -154,7 +176,7 @@ const HISTORICAL_INFLATION_RATES: { year: number; rate: number }[] = [
   { year: 2009, rate: -0.4 }, { year: 2010, rate: 1.6 }, { year: 2011, rate: 3.2 }, { year: 2012, rate: 2.1 }, { year: 2013, rate: 1.5 },
   { year: 2014, rate: 1.6 }, { year: 2015, rate: 0.1 }, { year: 2016, rate: 1.3 }, { year: 2017, rate: 2.1 }, { year: 2018, rate: 2.4 },
   { year: 2019, rate: 1.8 }, { year: 2020, rate: 1.2 }, { year: 2021, rate: 4.7 }, { year: 2022, rate: 8.0 }, { year: 2023, rate: 3.4 },
-  { year: 2024, rate: 2.6 }, { year: 2025, rate: 2.3 } // 2025 Forecast
+  { year: 2024, rate: 2.6 }, { year: 2025, rate: 2.7 }, { year: 2026, rate: 2.6 } // 2025: BLS actual, 2026: Federal Reserve/Trading Economics forecast
 ];
 
 // Approximate VT (Vanguard Total World Stock ETF) Annual Returns
@@ -176,6 +198,8 @@ const VT_ANNUAL_RETURNS: { year: number; return: number }[] = [
   { year: 2022, return: -18.0 },
   { year: 2023, return: 22.0 },
   { year: 2024, return: 18.2 },
+  { year: 2025, return: 15.5 }, // 2025 actual full-year return
+  { year: 2026, return: 8.0 }, // 2026 YTD estimate (conservative)
 ];
 
 // Approximate VTI (Vanguard Total Stock Market ETF) Annual Returns
@@ -197,6 +221,8 @@ const VTI_ANNUAL_RETURNS: { year: number; return: number }[] = [
   { year: 2022, return: -19.5 },
   { year: 2023, return: 26.1 },
   { year: 2024, return: 22.4 },
+  { year: 2025, return: 23.5 }, // 2025 actual full-year return
+  { year: 2026, return: 10.0 }, // 2026 YTD estimate (conservative)
 ];
 
 // Approximate VOO (Vanguard S&P 500 ETF) Annual Returns
@@ -218,6 +244,8 @@ const VOO_ANNUAL_RETURNS: { year: number; return: number }[] = [
   { year: 2022, return: -18.1 },
   { year: 2023, return: 26.3 },
   { year: 2024, return: 25.0 },
+  { year: 2025, return: 23.8 }, // 2025 actual full-year return
+  { year: 2026, return: 10.5 }, // 2026 YTD estimate (conservative)
 ];
 
 // Master Price Cache (populated once per session or from local storage)
@@ -311,7 +339,7 @@ export const refreshMarketData = async (): Promise<void> => {
   }
 };
 
-export const fetchStockQuote = async (ticker: string): Promise<{ price: number; name: string; sector: string; lastUpdated: string; dailyChange?: number; yearlyReturn?: number } | null> => {
+export const fetchStockQuote = async (ticker: string): Promise<StockQuote | null> => {
   if (!ticker) return null;
   const t = ticker.toUpperCase();
   // Hash for data consistency on unknown tickers (used for mock sector/name generation)
@@ -632,10 +660,13 @@ export const getChartData = async (
 
   // Determine date range based on oldest investment
   // Default to 2 years (current + previous) to form a line if no valid yearsHeld found
-  const maxYearsHeld = portfolio.reduce((max, p) => Math.max(max, p.yearsHeld || 0), 0);
+  const maxYearsHeld = portfolio.length > 0
+    ? portfolio.reduce((max, p) => Math.max(max, p.yearsHeld || 0), 0)
+    : 0;
 
   // Calculate start year relative to now
-  let calculatedStartYear = currentYear - Math.ceil(maxYearsHeld);
+  // Ensure minimum 2 years for proper chart rendering (empty or very new portfolios)
+  let calculatedStartYear = currentYear - Math.max(Math.ceil(maxYearsHeld), 2);
 
   // Clamp start year to VT Inception (2008)
   // This prevents data being pulled/shown older than the benchmark

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AreaChart, Area, ResponsiveContainer, XAxis, Tooltip, YAxis, CartesianGrid } from 'recharts';
+import { AreaChart, Area, ResponsiveContainer, XAxis, Tooltip, YAxis, CartesianGrid, TooltipProps } from 'recharts';
 import { StockPosition, ChartDataPoint } from '../types';
 import DeepDivePanel from './DeepDivePanel';
 import { COLORS, CURRENCY_FORMATTER } from '../constants';
@@ -15,25 +15,126 @@ interface DashboardProps {
     onAddRow: () => void;
     onBulkImport: (file: File) => void;
     onLoadDemo: () => void;
-    benchmark: 'VT' | 'VTI' | 'VOO';
+    benchmark: 'V T' | 'VTI' | 'VOO';
     onBenchmarkChange: (b: 'VT' | 'VTI' | 'VOO') => void;
     onViewGuide: () => void;
     lastUpdated?: string | null;
+    importing?: boolean;
+    importProgress?: { current: number; total: number };
+    importError?: string | null;
 }
 
 // Internal Memoized Chart Component
 // This isolation prevents the chart from re-rendering on every keystroke in the input table
 // The chart only updates when `chartData` or `benchmark` explicitly change.
 const DashboardChart = React.memo(({ chartData, benchmark, totalCost }: { chartData: ChartDataPoint[], benchmark: string, totalCost: number }) => {
+    // View State
+    const [viewMode, setViewMode] = useState<'percent' | 'real' | 'growth'>('percent');
+    const [timeRange, setTimeRange] = useState<'max' | '5y' | '3y' | '1y'>('max');
+
+    const processedData = useMemo(() => {
+        if (!chartData || chartData.length === 0) return [];
+
+        let data = [...chartData];
+
+        // 1. Filter by Time Range
+        if (timeRange !== 'max') {
+            const currentYear = new Date().getFullYear();
+            // yearsToInclude: 5Y shows 5 years, 3Y shows 3 years, 1Y shows minimum 2 years for line chart
+            const yearsToInclude = timeRange === '5y' ? 5 : timeRange === '3y' ? 3 : 2;
+            // Calculate minYear to be inclusive of current year
+            // Example: 2026 with 5Y filter -> minYear = 2026 - (5-1) = 2022
+            // Shows: 2022, 2023, 2024, 2025, 2026 (5 data points)
+            const minYear = currentYear - (yearsToInclude - 1);
+            data = data.filter(d => parseInt(d.date) >= minYear);
+        }
+
+        // 2. Transform by View Mode
+        // Re-baseline the data to 0 (or 10k) at the start of the filtered period
+        if (data.length > 0) {
+            const startNode = data[0];
+            const startPortfolio = startNode.portfolio; // These are % growth from absolute inception
+            const startBenchmark = startNode.benchmark;
+            const startInflation = startNode.inflation;
+
+            // Helper to get raw multiplier from the % string: 20% -> 1.20
+            const getMult = (pct: number) => 1 + (pct / 100);
+
+            // We need to chain link: Current Value = (Global_Index_Current / Global_Index_Start_Of_Window)
+            // But we only have the Global Index relative to 100, so:
+            // Val_Inv_Window = (1 + Global_Pct / 100) / (1 + Start_Pct / 100)
+
+            // Base Multipliers for the WINDOW START
+            const basePort = 1 + (startPortfolio / 100);
+            const baseBench = 1 + (startBenchmark / 100);
+            const baseInf = 1 + (startInflation / 100);
+
+            data = data.map(d => {
+                // Current Multipliers from GLOBAL START
+                const currPort = 1 + (d.portfolio / 100);
+                const currBench = 1 + (d.benchmark / 100);
+                const currInf = 1 + (d.inflation / 100);
+
+                // Windowed Multipliers (Growth since start of this view)
+                const winPort = currPort / basePort;
+                const winBench = currBench / baseBench;
+                const winInf = currInf / baseInf;
+
+                if (viewMode === 'growth') {
+                    // Growth of $10,000
+                    return {
+                        ...d,
+                        portfolio: parseFloat(((winPort * 10000).toFixed(0))),
+                        benchmark: parseFloat(((winBench * 10000).toFixed(0))),
+                        // Inflation shows only the cumulative drag (interest accrued), not the full 10K
+                        inflation: parseFloat((((winInf - 1) * 10000).toFixed(0))),
+                    };
+                } else if (viewMode === 'real') {
+                    // Real Return % (Purchasing Power)
+                    // Real = (1+Nominal)/(1+Inflation) - 1
+                    const realPort = (winPort / winInf) - 1;
+                    const realBench = (winBench / winInf) - 1;
+
+                    return {
+                        ...d,
+                        portfolio: parseFloat(((realPort * 100).toFixed(1))),
+                        benchmark: parseFloat(((realBench * 100).toFixed(1))),
+                        inflation: 0, // Baseline
+                    };
+                } else {
+                    // Standard Percent Return in this window
+                    return {
+                        ...d,
+                        portfolio: parseFloat(((winPort - 1) * 100).toFixed(1)),
+                        benchmark: parseFloat(((winBench - 1) * 100).toFixed(1)),
+                        inflation: parseFloat(((winInf - 1) * 100).toFixed(1)),
+                    };
+                }
+            });
+        }
+
+        return data;
+    }, [chartData, viewMode, timeRange]);
+
 
     const gradientStops = useMemo(() => {
-        if (!chartData || chartData.length < 2) return null;
+        // If Real Return mode, we just check if Portfolio > 0 (since Inflation is 0)
+        // If Standard mode, we check Portfolio > Inflation
+
+        if (!processedData || processedData.length < 2) return null;
 
         const stops = [];
-        const lastIdx = chartData.length - 1;
+        const lastIdx = processedData.length - 1;
+        const compareKey = viewMode === 'real' ? 0 : 'inflation';
 
-        // Determine initial state (Above = Portfolio > Inflation)
-        let isAbove = chartData[0].portfolio > chartData[0].inflation;
+        const getDiff = (item: ChartDataPoint): number => {
+            if (viewMode === 'real') return item.portfolio; // > 0 is good
+            if (viewMode === 'growth') return item.portfolio - item.inflation; // > Inflation line
+            return item.portfolio - item.inflation;
+        };
+
+        // Determine initial state
+        let isAbove = getDiff(processedData[0]) > 0;
 
         // Helper: Blue (Secondary) if Above, Purple (Primary) if Below
         const getColor = (above: boolean) => above ? COLORS.secondary : COLORS.primary;
@@ -44,110 +145,112 @@ const DashboardChart = React.memo(({ chartData, benchmark, totalCost }: { chartD
         stops.push(<stop key="start" offset="0%" stopColor={currentColor} stopOpacity={1} />);
 
         for (let i = 0; i < lastIdx; i++) {
-            const curr = chartData[i];
-            const next = chartData[i + 1];
+            const curr = processedData[i];
+            const next = processedData[i + 1];
 
-            const currDiff = curr.portfolio - curr.inflation;
-            const nextDiff = next.portfolio - next.inflation;
+            const currDiff = getDiff(curr);
+            const nextDiff = getDiff(next);
 
-            // Check for crossing: One is positive (>0), other is non-positive (<=0)
-            // We treat 0 as "Below/Equal" for strict > check logic
             const currIsAbove = currDiff > 0;
             const nextIsAbove = nextDiff > 0;
 
             if (currIsAbove !== nextIsAbove) {
-                // Calculate intersection point using linear interpolation
-                // t = |y1| / (|y1| + |y2|)
+                // Calculate intersection
                 const range = Math.abs(currDiff) + Math.abs(nextDiff);
                 const t = Math.abs(currDiff) / range;
-
-                // Global offset for the chart (0 to 1)
                 const globalOffset = (i + t) / lastIdx;
 
-                // Add hard transition stops
                 stops.push(<stop key={`stop-${i}-a`} offset={globalOffset} stopColor={currentColor} stopOpacity={1} />);
-
-                // Switch color
                 isAbove = !isAbove;
                 currentColor = getColor(isAbove);
-
                 stops.push(<stop key={`stop-${i}-b`} offset={globalOffset} stopColor={currentColor} stopOpacity={1} />);
             }
         }
 
-        // End Stop
         stops.push(<stop key="end" offset="100%" stopColor={currentColor} stopOpacity={1} />);
         return stops;
-    }, [chartData]);
+    }, [processedData, viewMode]);
 
-    const CustomTooltip = ({ active, payload, label }: any) => {
+    const CustomTooltip: React.FC<TooltipProps<number, string>> = ({ active, payload, label }) => {
         if (active && payload && payload.length) {
             return (
                 <div className="bg-[#131219] border border-[#23222f] rounded-xl shadow-2xl p-4 min-w-[240px] backdrop-blur-md">
                     <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-3">{label}</p>
                     <div className="flex flex-col gap-3">
-                        {payload.map((entry: any, index: number) => {
-                            // Determine color and display name
+                        {payload.map((entry, index: number) => {
                             let color = entry.color;
                             let name = entry.name;
                             let isPortfolio = entry.dataKey === 'portfolio';
                             let isInflation = entry.dataKey === 'inflation';
+                            const value = entry.value || 0;
 
-                            // Calculate Value
-                            const pctValue = entry.value;
+                            // Custom formatting based on mode
+                            const formatValue = (val: number) => {
+                                if (viewMode === 'growth') return CURRENCY_FORMATTER.format(val);
+                                return `${val > 0 ? '+' : ''}${val.toFixed(1)}%`;
+                            };
 
+                            if (isInflation && viewMode === 'real') {
+                                // Don't show Inflation line tooltip in Real mode (it's flat 0)
+                                return null;
+                            }
+
+                            // Inflation Item in Growth/Percentage Mode
                             if (isInflation) {
-                                // Inflation Specific Logic
-                                const currentIndex = chartData.findIndex(item => item.date === label);
-                                const prevInflation = currentIndex > 0 ? chartData[currentIndex - 1].inflation : 0;
-                                const periodDelta = pctValue - prevInflation;
-
-                                const periodDrag = totalCost * (periodDelta / 100);
-                                const totalDrag = totalCost * (pctValue / 100);
-
                                 return (
                                     <div key={index} className="flex flex-col">
                                         <div className="flex items-center gap-2 mb-0.5">
                                             <div className="w-2 h-2 rounded-full border border-dashed border-red-400"></div>
-                                            <span className="text-gray-300 text-sm font-medium">Inflation Impact</span>
+                                            <span className="text-gray-300 text-sm font-medium">Inflation Limit</span>
                                         </div>
-                                        <div className="flex flex-col pl-4 gap-1">
-                                            <div className="flex items-center justify-between w-full gap-4">
-                                                <span className="text-sm text-gray-400 font-medium whitespace-nowrap">This Year</span>
-                                                <div className="flex items-center gap-2 text-right">
-                                                    <span className="text-sm font-bold text-white">{periodDelta.toFixed(1)}%</span>
-                                                    <span className="text-sm font-medium text-red-400">
-                                                        (-{CURRENCY_FORMATTER.format(periodDrag)})
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between w-full gap-4">
-                                                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Cumulative</span>
-                                                <div className="flex items-center gap-2 text-right">
-                                                    <span className="text-xs font-medium text-gray-400">{pctValue.toFixed(1)}%</span>
-                                                    <span className="text-xs text-red-500/80 font-medium">
-                                                        (-{CURRENCY_FORMATTER.format(totalDrag)})
-                                                    </span>
-                                                </div>
-                                            </div>
+                                        <div className="pl-4">
+                                            <span className="text-lg font-bold text-red-400/90">{formatValue(value)}</span>
                                         </div>
                                     </div>
                                 );
                             }
 
-                            // Style Logic
                             let valueClass = 'text-gray-400';
                             let indicatorColor = color;
 
                             if (isPortfolio) {
-                                indicatorColor = '#ffffff'; // White
+                                indicatorColor = '#ffffff';
                                 valueClass = 'text-white';
                             } else if (entry.dataKey === 'benchmark') {
-                                indicatorColor = '#34d399'; // Green (emerald-400)
+                                indicatorColor = '#34d399';
                                 valueClass = 'text-emerald-400';
                             }
 
-                            const estimatedValue = totalCost * (1 + (pctValue / 100));
+                            // Calculate Alpha/Gap here for extra context
+                            // Find the benchmark value in payload
+                            const benchVal = payload.find((p) => p.dataKey === 'benchmark')?.value || 0;
+                            const inflationVal = payload.find((p) => p.dataKey === 'inflation')?.value || 0;
+
+                            let subText = null;
+                            if (isPortfolio) {
+                                if (viewMode === 'real') {
+                                    // In real mode, value IS real return
+                                    const alpha = value - benchVal; // Real Alpha
+                                    subText = (
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-[10px] uppercase tracking-wider text-gray-500">Real Alpha</span>
+                                            <span className={`text-xs font-bold ${alpha >= 0 ? 'text-secondary' : 'text-primary'}`}>
+                                                {alpha > 0 ? '+' : ''}{alpha.toFixed(1)}%
+                                            </span>
+                                        </div>
+                                    );
+                                } else if (viewMode === 'percent') {
+                                    const realReturn = value - inflationVal;
+                                    subText = (
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-[10px] uppercase tracking-wider text-gray-500">Real Return</span>
+                                            <span className={`text-xs font-bold ${realReturn >= 0 ? 'text-secondary' : 'text-primary'}`}>
+                                                {realReturn > 0 ? '+' : ''}{realReturn.toFixed(1)}%
+                                            </span>
+                                        </div>
+                                    );
+                                }
+                            }
 
                             return (
                                 <div key={index} className="flex flex-col">
@@ -155,23 +258,15 @@ const DashboardChart = React.memo(({ chartData, benchmark, totalCost }: { chartD
                                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: indicatorColor }}></div>
                                         <span className="text-gray-300 text-sm font-medium">{name}</span>
                                     </div>
-                                    <div className="flex items-baseline justify-between pl-4">
+                                    <div className="flex flex-col pl-4">
                                         <span className={`text-lg font-bold font-display ${valueClass}`}>
-                                            {pctValue > 0 ? '+' : ''}{pctValue}%
+                                            {formatValue(value)}
                                         </span>
-                                        <span className={`text-sm font-medium ${isPortfolio ? 'text-gray-400' : 'text-gray-500'}`}>
-                                            {CURRENCY_FORMATTER.format(estimatedValue)}
-                                        </span>
+                                        {subText}
                                     </div>
                                 </div>
                             );
                         })}
-                    </div>
-
-                    <div className="mt-3 pt-3 border-t border-white/10">
-                        <p className="text-[10px] text-gray-500 italic">
-                            Values estimated based on current portfolio cost basis of {CURRENCY_FORMATTER.format(totalCost)}
-                        </p>
                     </div>
                 </div>
             );
@@ -188,41 +283,88 @@ const DashboardChart = React.memo(({ chartData, benchmark, totalCost }: { chartD
     }
 
     return (
-        <div className="w-full bg-surface border border-outline rounded-xl p-6 shadow-xl relative overflow-hidden">
-            {/* Legend */}
-            <div className="flex flex-wrap gap-x-6 gap-y-2 mb-4">
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.secondary }}></div>
-                    <p className="text-sm text-neutral-300">Portfolio (Above Inflation)</p>
+        <div className="w-full bg-surface border border-outline rounded-xl p-6 shadow-xl relative overflow-hidden flex flex-col gap-6">
+
+            {/* Controls Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                {/* Legend */}
+                <div className="flex flex-wrap gap-x-6 gap-y-2">
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.secondary }}></div>
+                        <p className="text-sm text-neutral-300">Winning</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.primary }}></div>
+                        <p className="text-sm text-neutral-300">Losing</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.chart.benchmark }}></div>
+                        <p className="text-sm text-neutral-300">Benchmark</p>
+                    </div>
+                    {viewMode !== 'real' && (
+                        <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full border border-dashed border-emerald-400"></div>
+                            <p className="text-sm text-neutral-300">Inflation</p>
+                        </div>
+                    )}
                 </div>
+
+                {/* View Controls */}
                 <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.primary }}></div>
-                    <p className="text-sm text-neutral-300">Portfolio (Below Inflation)</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS.chart.benchmark }}></div>
-                    <p className="text-sm text-neutral-300">Benchmark {benchmark}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full border border-dashed border-emerald-400"></div>
-                    <p className="text-sm text-neutral-300">Inflation</p>
-                </div>
-                <div className="group relative flex items-center ml-2 cursor-help">
-                    <span className="material-symbols-outlined text-muted text-sm hover:text-white transition-colors">info</span>
-                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-64 p-3 bg-bg-dark border border-outline rounded-lg shadow-xl text-xs text-muted hidden group-hover:block z-50">
-                        This chart shows a simplified projection of your portfolio's growth based on your holdings' total return and the benchmark's historical annual returns. It implies a constant performance gap and does not represent actual historical price movements.
+                    <div className="flex bg-black/20 p-1 rounded-lg border border-outline/50">
+                        <button
+                            onClick={() => setTimeRange('max')}
+                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${timeRange === 'max' ? 'bg-white/10 text-white shadow-sm' : 'text-muted hover:text-white'}`}
+                        >
+                            Max
+                        </button>
+                        <button
+                            onClick={() => setTimeRange('5y')}
+                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${timeRange === '5y' ? 'bg-white/10 text-white shadow-sm' : 'text-muted hover:text-white'}`}
+                        >
+                            5Y
+                        </button>
+                        <button
+                            onClick={() => setTimeRange('3y')}
+                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${timeRange === '3y' ? 'bg-white/10 text-white shadow-sm' : 'text-muted hover:text-white'}`}
+                        >
+                            3Y
+                        </button>
+                    </div>
+                    <div className="h-6 w-px bg-outline/50 mx-1"></div>
+                    <div className="flex bg-black/20 p-1 rounded-lg border border-outline/50">
+                        <button
+                            onClick={() => setViewMode('percent')}
+                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${viewMode === 'percent' ? 'bg-white/10 text-white shadow-sm' : 'text-muted hover:text-white'}`}
+                            title="Nominal Return %"
+                        >
+                            %
+                        </button>
+                        <button
+                            onClick={() => setViewMode('real')}
+                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${viewMode === 'real' ? 'bg-white/10 text-white shadow-sm' : 'text-muted hover:text-white'}`}
+                            title="Real Return (Purchasing Power)"
+                        >
+                            Real
+                        </button>
+                        <button
+                            onClick={() => setViewMode('growth')}
+                            className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${viewMode === 'growth' ? 'bg-white/10 text-white shadow-sm' : 'text-muted hover:text-white'}`}
+                            title="Growth of $10k"
+                        >
+                            $10k
+                        </button>
                     </div>
                 </div>
             </div>
 
             <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <AreaChart data={processedData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <defs>
                             <linearGradient id="splitColor" x1="0" y1="0" x2="100%" y2="0">
                                 {gradientStops}
                             </linearGradient>
-                            {/* Benchmark Gradient */}
                             <linearGradient id="benchmarkGradient" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor={COLORS.chart.benchmark} stopOpacity={0.3} />
                                 <stop offset="95%" stopColor={COLORS.chart.benchmark} stopOpacity={0} />
@@ -239,14 +381,14 @@ const DashboardChart = React.memo(({ chartData, benchmark, totalCost }: { chartD
                         />
                         <YAxis
                             stroke="#8f8f9c"
-                            tick={{ fill: '#ffffff', fontSize: 12 }} // White text for readability
+                            tick={{ fill: '#ffffff', fontSize: 12 }}
                             tickLine={false}
                             axisLine={false}
-                            tickFormatter={(value) => `${value > 0 ? '+' : ''}${value}%`}
-                            domain={['dataMin', 'dataMax']} // Auto-scale to fit data
+                            tickFormatter={(value) => viewMode === 'growth' ? `$${value / 1000}k` : `${value > 0 ? '+' : ''}${value}%`}
+                            domain={['dataMin', 'dataMax']}
                         />
                         <Tooltip content={<CustomTooltip />} />
-                        {/* Benchmark Area */}
+
                         <Area
                             type="monotone"
                             dataKey="benchmark"
@@ -256,18 +398,34 @@ const DashboardChart = React.memo(({ chartData, benchmark, totalCost }: { chartD
                             name={`Benchmark ${benchmark}`}
                             animationDuration={300}
                         />
-                        {/* Inflation Line */}
-                        <Area
-                            type="monotone"
-                            dataKey="inflation"
-                            stroke={COLORS.chart.inflation}
-                            strokeWidth={2}
-                            strokeDasharray="5 5"
-                            fill="none"
-                            name="Inflation"
-                            animationDuration={300}
-                        />
-                        {/* Portfolio Line (Dynamic Color) */}
+                        {/* Inflation Line - Hidden in Real Mode usually, or flat 0 */}
+                        {viewMode !== 'real' && (
+                            <Area
+                                type="monotone"
+                                dataKey="inflation"
+                                stroke={COLORS.chart.inflation}
+                                strokeWidth={2}
+                                strokeDasharray="5 5"
+                                fill="none"
+                                name="Inflation"
+                                animationDuration={300}
+                            />
+                        )}
+
+                        {/* Zero Line for Real Return Mode context */}
+                        {viewMode === 'real' && (
+                            <Area
+                                type="monotone"
+                                dataKey="inflation" // Inflation is 0 in real mode
+                                stroke={COLORS.chart.inflation}
+                                strokeWidth={1}
+                                strokeDasharray="5 5"
+                                fill="none"
+                                name="Baseline (0%)"
+                                animationDuration={300}
+                            />
+                        )}
+
                         <Area
                             type="monotone"
                             dataKey="portfolio"
@@ -299,7 +457,10 @@ const Dashboard: React.FC<DashboardProps> = ({
     benchmark,
     onBenchmarkChange,
     onViewGuide,
-    lastUpdated
+    lastUpdated,
+    importing,
+    importProgress,
+    importError
 }) => {
     const [selectedStock, setSelectedStock] = useState<StockPosition | null>(null);
     const [dragActive, setDragActive] = useState(false);
@@ -462,6 +623,40 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <span className="material-symbols-outlined text-amber-400">warning</span>
                         <span className="text-sm font-medium">{toastMessage}</span>
                         <button onClick={() => setShowToast(false)} className="hover:text-white"><span className="material-symbols-outlined text-sm">close</span></button>
+                    </div>
+                </div>
+            )}
+
+            {/* Import Progress Modal */}
+            {importing && importProgress && importProgress.total > 0 && (
+                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top duration-300">
+                    <div className="bg-surface border border-outline text-white px-6 py-4 rounded-lg shadow-2xl backdrop-blur-md min-w-[320px]">
+                        <div className="flex items-center gap-3 mb-3">
+                            <span className="material-symbols-outlined text-secondary animate-spin">progress_activity</span>
+                            <span className="text-sm font-semibold">Importing Portfolio...</span>
+                        </div>
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-xs text-muted">
+                                <span>Progress</span>
+                                <span>{importProgress.current} / {importProgress.total}</span>
+                            </div>
+                            <div className="w-full bg-bg-dark rounded-full h-2 overflow-hidden">
+                                <div
+                                    className="h-full bg-secondary transition-all duration-300"
+                                    style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Import Error/Success Display */}
+            {!importing && importError && (
+                <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top duration-300">
+                    <div className="bg-surface border border-outline px-4 py-3 rounded-lg shadow-xl flex items-center gap-3 backdrop-blur-md">
+                        <span className="material-symbols-outlined text-amber-400">info</span>
+                        <span className="text-sm text-white">{importError}</span>
                     </div>
                 </div>
             )}

@@ -2,6 +2,8 @@ export interface Env {
     Exchange_Stock_Data?: string;
     SHEET_CSV_URL?: string;
     PRICES: KVNamespace;
+    TURNSTILE_SECRET_KEY?: string;
+    BTC_EMAIL?: string;
 }
 
 export interface StockData {
