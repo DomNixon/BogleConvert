@@ -41,20 +41,23 @@ const StockReport: React.FC<StockReportProps> = ({ portfolio, initialTicker = "A
 
     if (displayData) {
         // Calculate average inflation over holdings period or default to 5 years
-        const avgInflationRate = getAverageInflationRate(matchedPortfolioStock?.yearsHeld || 5);
+        // const avgInflationRate = getAverageInflationRate(matchedPortfolioStock?.yearsHeld || 5);
 
         if (matchedPortfolioStock) {
             // Use Portfolio specific data
             annualGrowth = matchedPortfolioStock.cagr;
             // Real Buying Power (Annualized Real Return)
-            // Formula: ((1 + CAGR) / (1 + Inflation)) - 1
-            const realCagr = ((1 + (annualGrowth / 100)) / (1 + avgInflationRate) - 1) * 100;
+            // Fix: Use Geometric Annualization of the Total Real Return to match DeepDivePanel
+            // Formula: ((1 + TotalRealReturn)^(1/years) - 1)
+            const years = Math.max(matchedPortfolioStock.yearsHeld, 1);
+            const realCagr = ((Math.pow((1 + (matchedPortfolioStock.inflationAdjReturn / 100)), (1 / years))) - 1) * 100;
             realBuyingPower = Number(realCagr.toFixed(1));
         } else {
             // Use Market data fallback (Yearly Return)
             annualGrowth = displayData.marketAnnualReturn || 10.0;
             // Approximate Real Power for generic market data
-            // Real = ((1 + r) / (1 + i)) - 1
+            // For general lookup, we still estimate using the default 5Y avg inflation
+            const avgInflationRate = getAverageInflationRate(5);
             const realRet = ((1 + (annualGrowth / 100)) / (1 + avgInflationRate) - 1) * 100;
             realBuyingPower = Number(realRet.toFixed(1));
         }
@@ -242,21 +245,31 @@ const StockReport: React.FC<StockReportProps> = ({ portfolio, initialTicker = "A
                                     )}
                                 </div>
 
-                                {/* 3. 52-Week Range */}
+                                {/* 3. Bogle Speculation Meter */}
                                 <div className="flex flex-col items-center justify-center text-center rounded-lg p-4 bg-white/5 border border-outline min-h-[180px]">
-                                    <div className="w-full max-w-xs">
-                                        <p className="text-muted text-sm font-medium leading-normal mb-2">52-Week Range</p>
-                                        <p className="text-white tracking-light text-2xl font-bold font-display leading-tight">${displayData.rangeLow} - ${displayData.rangeHigh}</p>
-                                        <div className="relative w-full h-2 bg-outline rounded-full mt-4 mx-auto">
-                                            <div
-                                                className="absolute h-full bg-gradient-to-r from-secondary to-primary rounded-full transition-all duration-700"
-                                                style={{
-                                                    left: '20%',
-                                                    width: '50%'
-                                                }}
-                                            ></div>
+                                    {displayData.sector === 'ETF' ? (
+                                        <div className="flex flex-col items-center gap-2 animate-in fade-in zoom-in duration-500">
+                                            <div className="p-3 rounded-full bg-secondary/10 text-secondary mb-1">
+                                                <span className="material-symbols-outlined text-3xl">shield</span>
+                                            </div>
+                                            <div>
+                                                <p className="text-muted text-sm font-medium leading-normal mb-1">Bogle Speculation Meter</p>
+                                                <p className="text-secondary tracking-light text-2xl font-bold font-display leading-tight">Diversified</p>
+                                            </div>
+                                            <p className="text-xs text-muted max-w-[200px] leading-relaxed">Broad market exposure. The cornerstone of a passive portfolio.</p>
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-2 animate-in fade-in zoom-in duration-500">
+                                            <div className="p-3 rounded-full bg-primary/10 text-primary mb-1">
+                                                <span className="material-symbols-outlined text-3xl">local_fire_department</span>
+                                            </div>
+                                            <div>
+                                                <p className="text-muted text-sm font-medium leading-normal mb-1">Bogle Speculation Meter</p>
+                                                <p className="text-primary tracking-light text-2xl font-bold font-display leading-tight">Speculative</p>
+                                            </div>
+                                            <p className="text-xs text-muted max-w-[200px] leading-relaxed">Individual stock risk. Limit to &lt; 5% of total portfolio.</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

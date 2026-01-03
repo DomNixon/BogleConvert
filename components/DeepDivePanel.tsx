@@ -17,6 +17,12 @@ const DeepDivePanel: React.FC<DeepDivePanelProps> = ({ stock, onClose, onViewRep
   const totalValue = stock.shares * stock.currentPrice;
   const totalGain = (stock.currentPrice - stock.avgCost) * stock.shares;
 
+  // Calculate local "Annualized" Real Return for display
+  // stock.inflationAdjReturn is the TOTAL real return over the holding period.
+  // We need to annualize it to match the label "Real Annual Growth"
+  const years = Math.max(stock.yearsHeld, 1);
+  const realAnnualGrowth = ((Math.pow((1 + (stock.inflationAdjReturn / 100)), (1 / years))) - 1) * 100;
+
   return (
     <aside className="w-full lg:w-[380px] flex-shrink-0 bg-surface border border-outline lg:rounded-xl p-6 flex flex-col gap-6 h-fit animate-in slide-in-from-right duration-300">
       <div className="flex justify-between items-center">
@@ -51,9 +57,9 @@ const DeepDivePanel: React.FC<DeepDivePanelProps> = ({ stock, onClose, onViewRep
         <div className="absolute inset-0 bg-gradient-to-r from-secondary/5 to-primary/5 opacity-50 group-hover:opacity-100 transition-opacity"></div>
         <p className="text-sm font-medium text-muted relative z-10">Averaged Reality</p>
         <p className="text-4xl font-bold font-display text-white mt-2 relative z-10">
-          {stock.inflationAdjReturn > 0 ? '+' : ''}{PERCENT_FORMATTER.format(stock.inflationAdjReturn / 100)}
+          {realAnnualGrowth > 0 ? '+' : ''}{PERCENT_FORMATTER.format(realAnnualGrowth / 100)}
         </p>
-        <p className={`text-base text-transparent bg-clip-text bg-gradient-to-r font-medium relative z-10 ${stock.inflationAdjReturn >= 0 ? 'from-secondary to-cyan-300' : 'from-primary to-purple-400'}`}>
+        <p className={`text-base text-transparent bg-clip-text bg-gradient-to-r font-medium relative z-10 ${realAnnualGrowth >= 0 ? 'from-secondary to-cyan-300' : 'from-primary to-purple-400'}`}>
           Real Annual Growth
         </p>
       </div>
@@ -62,7 +68,7 @@ const DeepDivePanel: React.FC<DeepDivePanelProps> = ({ stock, onClose, onViewRep
         <h3 className="text-base font-bold text-white">Performance Summary</h3>
         <p className="text-sm text-gray-400 leading-relaxed">
           {stock.name} ({stock.ticker.toUpperCase()}) has shown {stock.nominalReturn > 10 ? 'strong' : 'moderate'} nominal returns.
-          Its inflation-adjusted growth remains {stock.inflationAdjReturn > 0 ? 'robust' : 'lagging'}, indicating {stock.inflationAdjReturn > 0 ? 'a substantial increase' : 'a potential decrease'} in real purchasing power for the long-term holder.
+          Its inflation-adjusted growth remains {realAnnualGrowth > 0 ? 'robust' : 'lagging'}, indicating {realAnnualGrowth > 0 ? 'a substantial increase' : 'a potential decrease'} in real purchasing power for the long-term holder.
           The asset is currently classified as <span className="text-white font-medium">'{stock.status}'</span>
           {stock.status === 'Tracking Market' && (
             <span className="text-muted block mt-1 text-xs italic border-l-2 border-secondary/30 pl-2">

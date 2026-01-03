@@ -85,10 +85,27 @@ export async function fetchAndCachePrices(env: Env): Promise<{ prices: Record<st
                     // But CSV might have quoted fields. Assuming simple "Symbol, Price" format for now based on previous code.
                     const parts = line.split(',');
 
-                    if (parts.length >= 2) {
+                    if (parts.length >= 3) {
                         const ticker = parts[0].trim().toUpperCase();
 
                         // ONLY add if not already present from JSON (JSON is master)
+                        if (ticker && !prices[ticker]) {
+                            const name = parts[1].trim();
+                            const priceStr = parts[2].trim();
+                            const price = parseFloat(priceStr);
+
+                            if (!isNaN(price)) {
+                                prices[ticker] = {
+                                    price,
+                                    name: name || undefined
+                                };
+                                csvCount++;
+                            }
+                        }
+                    } else if (parts.length === 2) {
+                        // Backwards compatibility for Ticker, Price
+                        const ticker = parts[0].trim().toUpperCase();
+
                         if (ticker && !prices[ticker]) {
                             const priceStr = parts[1].trim();
                             const price = parseFloat(priceStr);

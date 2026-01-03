@@ -15,7 +15,10 @@ import {
   DEMO_PORTFOLIO,
   refreshMarketData,
   getLastDataUpdate,
-  savePortfolio
+  savePortfolio,
+  calculateStats,
+  mergePortfolios,
+  mergeStockIntoPortfolio
 } from './services/dataService';
 
 const App: React.FC = () => {
@@ -27,40 +30,7 @@ const App: React.FC = () => {
   const [reportTicker, setReportTicker] = useState<string>("AAPL");
   const [lastDataUpdate, setLastDataUpdate] = useState<string | null>(null);
 
-  // Helper to recalculate row stats
-  const calculateStats = (stock: StockPosition) => {
-    if (stock.avgCost > 0 && stock.currentPrice > 0) {
-      // Nominal Return %
-      const nominalReturn = ((stock.currentPrice - stock.avgCost) / stock.avgCost) * 100;
-      stock.nominalReturn = Number(nominalReturn.toFixed(1));
 
-      // Real Buying Power Calculation (Inflation Adjusted)
-      // Uses historical data based on years held
-      const cumulativeInflation = getCumulativeInflation(stock.yearsHeld);
-
-      // Real Return Formula: ((1 + Nominal) / (1 + CumulativeInflation)) - 1
-      const realReturn = ((1 + nominalReturn / 100) / (1 + cumulativeInflation) - 1) * 100;
-      stock.inflationAdjReturn = Number(realReturn.toFixed(1));
-
-      // Calculate CAGR (Annual Growth)
-      // For holdings < 1 year, use 1 year minimum to avoid unrealistic CAGR spikes
-      const years = stock.yearsHeld > 0 ? Math.max(stock.yearsHeld, 1) : 1;
-      const totalRatio = stock.currentPrice / stock.avgCost;
-      // Formula: (Ending / Beginning) ^ (1 / n) - 1
-      const cagr = (Math.pow(totalRatio, 1 / years) - 1) * 100;
-      stock.cagr = Number(cagr.toFixed(1));
-
-      if (stock.inflationAdjReturn > 1) stock.status = 'Beating Inflation';
-      else if (stock.inflationAdjReturn >= -1) stock.status = 'Tracking Market';
-      else stock.status = 'Losing Power';
-    } else {
-      stock.nominalReturn = 0;
-      stock.inflationAdjReturn = 0;
-      stock.status = 'Tracking Market';
-      stock.cagr = 0;
-    }
-    return stock;
-  };
 
   // Helper to recalculate portfolio weights based on current value
   const recalculateWeights = (portfolioData: StockPosition[]): StockPosition[] => {
@@ -164,7 +134,8 @@ const App: React.FC = () => {
 
       // Recalculate returns if Average Cost or Years is updated
       if (field === 'avgCost' || field === 'yearsHeld') {
-        calculateStats(stock);
+        const updatedStock = calculateStats(stock);
+        Object.assign(stock, updatedStock); // Merge updated stats back into stock object
       }
 
       newPortfolio[index] = stock;
@@ -192,9 +163,25 @@ const App: React.FC = () => {
           stock.sector = quote.sector;
           stock.lastUpdated = quote.lastUpdated;
 
-          calculateStats(stock);
 
-          newPortfolio[index] = stock;
+          const updatedStock = calculateStats(stock);
+          Object.assign(stock, updatedStock);
+
+          // Check if this ticker exists elsewhere in the portfolio (excluding current index)
+          const duplicateIndex = newPortfolio.findIndex((p, i) => i !== index && p.ticker.toUpperCase() === ticker.toUpperCase());
+
+          if (duplicateIndex !== -1) {
+            // Merge current into duplicate
+            const merged = mergeStockIntoPortfolio([newPortfolio[duplicateIndex]], stock)[0];
+            newPortfolio[duplicateIndex] = merged;
+
+            // Remove the current row since it's now merged
+            newPortfolio.splice(index, 1);
+          } else {
+            newPortfolio[index] = stock;
+          }
+
+
 
           // Recalculate weights since currentPrice changed
           return recalculateWeights(newPortfolio);
@@ -254,63 +241,76 @@ const App: React.FC = () => {
       if (!text) return;
 
       const rows = text.split('\n');
-      const newStocks: StockPosition[] = [];
+      const rawStocks: StockPosition[] = [];
 
-      // Skip header if present (naive check)
+      // Helper for cleaning numbers (strip currency, commas)
+      const cleanNumber = (val: string) => {
+        if (!val) return 0;
+        return parseFloat(val.replace(/[^0-9.-]+/g, '')) || 0;
+      };
+
+      // Skip header if present
       const startIdx = rows[0].toLowerCase().includes('ticker') ? 1 : 0;
 
       for (let i = startIdx; i < rows.length; i++) {
         const row = rows[i].split(',').map(cell => cell.trim());
-        if (row.length >= 4 && row[0]) {
-          const ticker = row[0].toUpperCase();
-          const avgCost = parseFloat(row[1]) || 0;
-          const shares = parseFloat(row[2]) || 0;
-          const yearsHeld = parseFloat(row[3]) || 0;
 
-          // Fetch current data for the imported ticker
-          let currentPrice = 0;
-          let name = '';
-          let sector = '';
-          let lastUpdated = '';
+        // Basic validation: Must have ticker and at least one data column
+        if (row.length < 2 || !row[0]) continue;
 
-          try {
-            const quote = await fetchStockQuote(ticker);
-            if (quote) {
-              currentPrice = quote.price;
-              name = quote.name;
-              sector = quote.sector;
-              lastUpdated = quote.lastUpdated;
-            }
-          } catch (err) {
-            console.warn(`Could not fetch data for imported ticker ${ticker}`);
+        const ticker = row[0].toUpperCase();
+        // Safe access with fallbacks
+        const avgCost = row[1] ? cleanNumber(row[1]) : 0;
+        const shares = row[2] ? cleanNumber(row[2]) : 0;
+        const yearsHeld = row[3] ? cleanNumber(row[3]) : 0;
+
+        // Fetch current data
+        let currentPrice = 0;
+        let name = '';
+        let sector = '';
+        let lastUpdated = '';
+
+        try {
+          const quote = await fetchStockQuote(ticker);
+          if (quote) {
+            currentPrice = quote.price;
+            name = quote.name;
+            sector = quote.sector;
+            lastUpdated = quote.lastUpdated;
           }
-
-          let stock: StockPosition = {
-            ticker,
-            name,
-            avgCost,
-            currentPrice,
-            shares,
-            yearsHeld,
-            nominalReturn: 0,
-            inflationAdjReturn: 0,
-            status: 'Tracking Market',
-            sector: sector || 'Unknown',
-            weight: 0,
-            cagr: 0,
-            lastUpdated
-          };
-
-          stock = calculateStats(stock);
-          newStocks.push(stock);
+        } catch (err) {
+          console.warn(`Could not fetch data for imported ticker ${ticker}`);
         }
+
+        let stock: StockPosition = {
+          ticker,
+          name,
+          avgCost,
+          currentPrice,
+          shares,
+          yearsHeld,
+          nominalReturn: 0,
+          inflationAdjReturn: 0,
+          status: 'Tracking Market',
+          sector: sector || 'Unknown',
+          weight: 0,
+          cagr: 0,
+          lastUpdated
+        };
+
+        stock = calculateStats(stock);
+        rawStocks.push(stock);
       }
 
-      // Append new stocks to existing portfolio and recalculate weights
-      if (newStocks.length > 0) {
+      // 1. Consolidate the *imported* list first (handle duplicates within the CSV)
+      // We pass [] as initial to mergePortfolios to effectively just self-merge the list
+      const consolidatedImports = mergePortfolios([], rawStocks);
+
+      // 2. Merge consolidated imports into main portfolio
+      if (consolidatedImports.length > 0) {
         setPortfolio(prev => {
-          const combined = [...prev, ...newStocks];
-          return recalculateWeights(combined);
+          const merged = mergePortfolios(prev, consolidatedImports);
+          return recalculateWeights(merged);
         });
       }
     };

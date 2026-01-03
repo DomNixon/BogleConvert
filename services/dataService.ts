@@ -1,5 +1,120 @@
 import { StockPosition, ChartDataPoint, UserProfile } from '../types';
 
+/**
+ * Helper to recalculate row stats
+ */
+export const calculateStats = (stock: StockPosition): StockPosition => {
+  if (stock.avgCost > 0 && stock.currentPrice > 0) {
+    // Nominal Return %
+    const nominalReturn = ((stock.currentPrice - stock.avgCost) / stock.avgCost) * 100;
+    stock.nominalReturn = Number(nominalReturn.toFixed(1));
+
+    // Real Buying Power Calculation (Inflation Adjusted)
+    // Uses historical data based on years held
+    const cumulativeInflation = getCumulativeInflation(stock.yearsHeld);
+
+    // Real Return Formula: ((1 + Nominal) / (1 + CumulativeInflation)) - 1
+    const realReturn = ((1 + nominalReturn / 100) / (1 + cumulativeInflation) - 1) * 100;
+    stock.inflationAdjReturn = Number(realReturn.toFixed(1));
+
+    // Calculate CAGR (Annual Growth)
+    // For holdings < 1 year, use 1 year minimum to avoid unrealistic CAGR spikes
+    const years = stock.yearsHeld > 0 ? Math.max(stock.yearsHeld, 1) : 1;
+    const totalRatio = stock.currentPrice / stock.avgCost;
+    // Formula: (Ending / Beginning) ^ (1 / n) - 1
+    const cagr = (Math.pow(totalRatio, 1 / years) - 1) * 100;
+    stock.cagr = Number(cagr.toFixed(1));
+
+    if (stock.inflationAdjReturn > 1) stock.status = 'Beating Inflation';
+    else if (stock.inflationAdjReturn >= -1) stock.status = 'Tracking Market';
+    else stock.status = 'Losing Power';
+  } else {
+    stock.nominalReturn = 0;
+    stock.inflationAdjReturn = 0;
+    stock.status = 'Tracking Market';
+    stock.cagr = 0;
+  }
+  return stock;
+};
+
+/**
+ * Merges a single stock position into a list of existing positions.
+ * Updates stats if merged.
+ */
+export const mergeStockIntoPortfolio = (portfolio: StockPosition[], newStock: StockPosition): StockPosition[] => {
+  const existingIndex = portfolio.findIndex(p => p.ticker.toUpperCase() === newStock.ticker.toUpperCase());
+
+  if (existingIndex === -1) {
+    return [...portfolio, newStock];
+  }
+
+  const existing = portfolio[existingIndex];
+  const existingShares = Number(existing.shares) || 0;
+  const newShares = Number(newStock.shares) || 0;
+  const totalShares = existingShares + newShares;
+
+  // If total shares is 0, just update meta data provided by new stock but keep 0 cost/shares logic
+  if (totalShares === 0) {
+    const merged: StockPosition = {
+      ...existing,
+      ...newStock, // Overwrite with potentially newer name/sector/price
+      shares: 0,
+      avgCost: 0,
+      yearsHeld: Math.max(existing.yearsHeld, newStock.yearsHeld)
+    };
+    return [
+      ...portfolio.slice(0, existingIndex),
+      calculateStats(merged),
+      ...portfolio.slice(existingIndex + 1)
+    ];
+  }
+
+  // Weighted Average Cost
+  const existingCost = existingShares * (Number(existing.avgCost) || 0);
+  const newCost = newShares * (Number(newStock.avgCost) || 0);
+  const weightedAvgCost = (existingCost + newCost) / totalShares;
+
+  // Weighted Average Years Held (to prevent CAGR distortion)
+  // We weight by Total Cost invested to represent the "age" of the capital.
+  let weightedYearsHeld = 0;
+  if (existingCost + newCost > 0) {
+    weightedYearsHeld = ((existingCost * existing.yearsHeld) + (newCost * newStock.yearsHeld)) / (existingCost + newCost);
+  } else {
+    // Fallback to max if no cost basis (e.g. gifted/zero cost)
+    weightedYearsHeld = Math.max(existing.yearsHeld, newStock.yearsHeld);
+  }
+
+  const mergedStock: StockPosition = {
+    ...existing,
+    name: newStock.name || existing.name,
+    sector: newStock.sector || existing.sector,
+    currentPrice: newStock.currentPrice || existing.currentPrice,
+    lastUpdated: newStock.lastUpdated || existing.lastUpdated,
+    shares: totalShares,
+    avgCost: weightedAvgCost,
+    yearsHeld: parseFloat(weightedYearsHeld.toFixed(2))
+  };
+
+  const updatedStock = calculateStats(mergedStock);
+
+  return [
+    ...portfolio.slice(0, existingIndex),
+    updatedStock,
+    ...portfolio.slice(existingIndex + 1)
+  ];
+};
+
+/**
+ * Merges two full portfolios.
+ */
+export const mergePortfolios = (current: StockPosition[], incoming: StockPosition[]): StockPosition[] => {
+  let merged = [...current];
+  for (const stock of incoming) {
+    merged = mergeStockIntoPortfolio(merged, stock);
+  }
+  return merged;
+};
+
 // In a real Cloudflare Worker environment, these would be fetched via `fetch('/api/portfolio')`
 // managed by a Worker utilizing KV or D1 database.
 

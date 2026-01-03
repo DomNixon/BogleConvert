@@ -24,7 +24,7 @@ interface DashboardProps {
 // Internal Memoized Chart Component
 // This isolation prevents the chart from re-rendering on every keystroke in the input table
 // The chart only updates when `chartData` or `benchmark` explicitly change.
-const DashboardChart = React.memo(({ chartData, benchmark }: { chartData: ChartDataPoint[], benchmark: string }) => {
+const DashboardChart = React.memo(({ chartData, benchmark, totalCost }: { chartData: ChartDataPoint[], benchmark: string, totalCost: number }) => {
 
     const gradientStops = useMemo(() => {
         if (!chartData || chartData.length < 2) return null;
@@ -79,6 +79,105 @@ const DashboardChart = React.memo(({ chartData, benchmark }: { chartData: ChartD
         stops.push(<stop key="end" offset="100%" stopColor={currentColor} stopOpacity={1} />);
         return stops;
     }, [chartData]);
+
+    const CustomTooltip = ({ active, payload, label }: any) => {
+        if (active && payload && payload.length) {
+            return (
+                <div className="bg-[#131219] border border-[#23222f] rounded-xl shadow-2xl p-4 min-w-[240px] backdrop-blur-md">
+                    <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-3">{label}</p>
+                    <div className="flex flex-col gap-3">
+                        {payload.map((entry: any, index: number) => {
+                            // Determine color and display name
+                            let color = entry.color;
+                            let name = entry.name;
+                            let isPortfolio = entry.dataKey === 'portfolio';
+                            let isInflation = entry.dataKey === 'inflation';
+
+                            // Calculate Value
+                            const pctValue = entry.value;
+
+                            if (isInflation) {
+                                // Inflation Specific Logic
+                                const currentIndex = chartData.findIndex(item => item.date === label);
+                                const prevInflation = currentIndex > 0 ? chartData[currentIndex - 1].inflation : 0;
+                                const periodDelta = pctValue - prevInflation;
+
+                                const periodDrag = totalCost * (periodDelta / 100);
+                                const totalDrag = totalCost * (pctValue / 100);
+
+                                return (
+                                    <div key={index} className="flex flex-col">
+                                        <div className="flex items-center gap-2 mb-0.5">
+                                            <div className="w-2 h-2 rounded-full border border-dashed border-red-400"></div>
+                                            <span className="text-gray-300 text-sm font-medium">Inflation Impact</span>
+                                        </div>
+                                        <div className="flex flex-col pl-4 gap-1">
+                                            <div className="flex items-center justify-between w-full gap-4">
+                                                <span className="text-sm text-gray-400 font-medium whitespace-nowrap">This Year</span>
+                                                <div className="flex items-center gap-2 text-right">
+                                                    <span className="text-sm font-bold text-white">{periodDelta.toFixed(1)}%</span>
+                                                    <span className="text-sm font-medium text-red-400">
+                                                        (-{CURRENCY_FORMATTER.format(periodDrag)})
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between w-full gap-4">
+                                                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Cumulative</span>
+                                                <div className="flex items-center gap-2 text-right">
+                                                    <span className="text-xs font-medium text-gray-400">{pctValue.toFixed(1)}%</span>
+                                                    <span className="text-xs text-red-500/80 font-medium">
+                                                        (-{CURRENCY_FORMATTER.format(totalDrag)})
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            }
+
+                            // Style Logic
+                            let valueClass = 'text-gray-400';
+                            let indicatorColor = color;
+
+                            if (isPortfolio) {
+                                indicatorColor = '#ffffff'; // White
+                                valueClass = 'text-white';
+                            } else if (entry.dataKey === 'benchmark') {
+                                indicatorColor = '#34d399'; // Green (emerald-400)
+                                valueClass = 'text-emerald-400';
+                            }
+
+                            const estimatedValue = totalCost * (1 + (pctValue / 100));
+
+                            return (
+                                <div key={index} className="flex flex-col">
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: indicatorColor }}></div>
+                                        <span className="text-gray-300 text-sm font-medium">{name}</span>
+                                    </div>
+                                    <div className="flex items-baseline justify-between pl-4">
+                                        <span className={`text-lg font-bold font-display ${valueClass}`}>
+                                            {pctValue > 0 ? '+' : ''}{pctValue}%
+                                        </span>
+                                        <span className={`text-sm font-medium ${isPortfolio ? 'text-gray-400' : 'text-gray-500'}`}>
+                                            {CURRENCY_FORMATTER.format(estimatedValue)}
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-white/10">
+                        <p className="text-[10px] text-gray-500 italic">
+                            Values estimated based on current portfolio cost basis of {CURRENCY_FORMATTER.format(totalCost)}
+                        </p>
+                    </div>
+                </div>
+            );
+        }
+        return null;
+    };
 
     if (!chartData || chartData.length === 0) {
         return (
@@ -146,11 +245,7 @@ const DashboardChart = React.memo(({ chartData, benchmark }: { chartData: ChartD
                             tickFormatter={(value) => `${value > 0 ? '+' : ''}${value}%`}
                             domain={['dataMin', 'dataMax']} // Auto-scale to fit data
                         />
-                        <Tooltip
-                            contentStyle={{ backgroundColor: '#131219', borderColor: '#23222f', borderRadius: '8px' }}
-                            itemStyle={{ color: '#fff' }}
-                            formatter={(value: number) => [`${value > 0 ? '+' : ''}${value}%`, '']}
-                        />
+                        <Tooltip content={<CustomTooltip />} />
                         {/* Benchmark Area */}
                         <Area
                             type="monotone"
@@ -377,8 +472,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
                     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
 
+
                         {/* Chart Section */}
-                        <DashboardChart chartData={chartData} benchmark={benchmark} />
+                        {/* Calculate total investment for tooltip estimates */}
+                        <DashboardChart
+                            chartData={chartData}
+                            benchmark={benchmark}
+                            totalCost={portfolio.reduce((sum, p) => sum + (p.avgCost * p.shares), 0)}
+                        />
 
                         {/* Data Table */}
                         <div
