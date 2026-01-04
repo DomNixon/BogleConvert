@@ -40,7 +40,6 @@ export const COLORS = {
 export const DEFAULT_BENCHMARK: 'VT' | 'VTI' | 'VOO' = 'VT';
 export const DEFAULT_REPORT_TICKER = 'AAPL';
 export const LAST_DATA_YEAR = 2026;
-export const GITHUB_REPO_URL = import.meta.env.VITE_GITHUB_REPO || 'https://github.com/BogleConvert/BogleConvert';
 
 // Approximate Historical US Inflation Rates (CPI-U, Year-over-Year)
 export const HISTORICAL_INFLATION_RATES: { year: number; rate: number }[] = [

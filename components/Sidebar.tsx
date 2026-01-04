@@ -16,7 +16,6 @@
 
 import React from 'react';
 import { ViewState, UserProfile } from '../types';
-import { GITHUB_REPO_URL } from '../constants';
 
 interface SidebarProps {
   currentView: ViewState;
@@ -98,7 +97,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user }) =>
         */}
         {/* Source Code Link - AGPL Compliance */}
         <a
-          href={GITHUB_REPO_URL}
+          href={import.meta.env.VITE_GITHUB_REPO || 'https://github.com/BogleConvert/BogleConvert'}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-2 text-xs text-muted hover:text-white transition-colors border-t border-outline pt-4"

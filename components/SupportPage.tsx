@@ -16,10 +16,10 @@
 
 import React, { useState } from 'react';
 import { Turnstile } from '@marsidev/react-turnstile';
-import { GITHUB_REPO_URL } from '../constants';
 
 const SupportPage: React.FC = () => {
     const stripeUrl = import.meta.env.VITE_STRIPE_URL;
+    const githubRepo = import.meta.env.VITE_GITHUB_REPO;
     const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
     // BTC Email protection state
@@ -96,9 +96,9 @@ const SupportPage: React.FC = () => {
             title: 'Contribute to the Code',
             icon: 'code',
             description: 'Help improve BogleConvert by contributing to our open-source repository',
-            value: GITHUB_REPO_URL,
+            value: githubRepo,
             buttonText: 'View on GitHub',
-            action: () => window.open(GITHUB_REPO_URL, '_blank'),
+            action: () => githubRepo && window.open(githubRepo, '_blank'),
             gradient: 'from-purple-500/20 to-pink-600/20',
             border: 'border-purple-500/20',
             iconColor: 'text-purple-400'
