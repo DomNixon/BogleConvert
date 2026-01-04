@@ -7,37 +7,58 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-
-# Credentials
-.env
-
-# Dev 
 .gitignore
-.dev.vars
-.wrangler/
+
 
 # AI Agents Rules and Workflow
 /Rules/
 /Workflow/
 /Logs/
-.wrangler/tmp/bundle-8VgDmw/middleware-insertion-facade.js
-.wrangler/tmp/bundle-8VgDmw/middleware-loader.entry.ts
-.wrangler/tmp/dev-yOJBRU/functionsWorker-0.03205349522715517.js
-.wrangler/tmp/dev-yOJBRU/functionsWorker-0.03205349522715517.js.map
-.wrangler/tmp/pages-7xFjOl/functionsWorker-0.03205349522715517.mjs
-.wrangler/tmp/pages-7xFjOl/functionsWorker-0.03205349522715517.mjs.map
+
+
+# --- Dependencies ---
+node_modules
+.pnp
+.pnp.js
+
+# --- Testing ---
+coverage
+.nyc_output
+
+# --- Build Outputs (Vite/React) ---
+dist
+dist-ssr
+*.local
+
+# --- Cloudflare & Secrets (CRITICAL) ---
+.wrangler
+.dev.vars
+.env
+.env.*
+!.env.example
+
+# --- OS Junk (Mac/Windows/Linux) ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*~
+
+# --- IDEs ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Logs ---
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*

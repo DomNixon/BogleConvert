@@ -1,3 +1,18 @@
+/*
+ * Copyright (c) 2026 Mid Michigan Connections LLC.
+ * This file is part of BogleConvert.
+ *
+ * BogleConvert is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, version 3 of the License.
+ *
+ * BogleConvert is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License along
+ * with BogleConvert. If not, see <https://www.gnu.org/licenses/>.
+ */
 
 import React from 'react';
 import { ViewState, UserProfile } from '../types';
@@ -78,6 +93,26 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user }) =>
           </div>
         </div>
         */}
+        {/* Source Code Link - AGPL Compliance */}
+        <a
+          href={import.meta.env.VITE_GITHUB_REPO || 'https://github.com/DomNixon/BogleConvert'}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 text-xs text-muted hover:text-white transition-colors border-t border-outline pt-4"
+        >
+          <span className="material-symbols-outlined text-base">code</span>
+          <span>Source Code (AGPLv3)</span>
+        </a>
+
+        {/* Company Attribution */}
+        <a
+          href="https://midmichiganconnections.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center text-[10px] text-muted/60 hover:text-muted transition-colors mt-2"
+        >
+          © 2026 Mid Michigan Connections LLC
+        </a>
       </div>
     </aside>
   );

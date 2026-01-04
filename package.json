@@ -14,15 +14,16 @@
     "@marsidev/react-turnstile": "^1.4.1",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
-    "recharts": "^3.5.1",
-    "wrangler": "^4.54.0"
+    "recharts": "^3.5.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251230.0",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "@vitest/coverage-v8": "^3.2.4",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "wrangler": "^4.54.0"
   }
 }

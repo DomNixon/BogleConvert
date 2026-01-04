@@ -1,3 +1,19 @@
+/*
+ * Copyright (c) 2026 Mid Michigan Connections LLC.
+ * This file is part of BogleConvert.
+ *
+ * BogleConvert is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, version 3 of the License.
+ *
+ * BogleConvert is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License along
+ * with BogleConvert. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { StockPosition, ChartDataPoint, UserProfile } from '../types';
 
 // Type for stock quote data returned from API
@@ -319,10 +335,12 @@ export const getLastDataUpdate = (): string | null => {
 };
 
 export const getUserProfile = async (): Promise<UserProfile> => {
+  // Local-first: No external user profiles. This is a placeholder for the UI.
+  // The app intentionally does not collect or store personal user data.
   return {
-    name: "Alex Doe",
-    email: "alex.doe@email.com",
-    avatarUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuDfjWZJms34HyG5dfJd_yA9YI6Suo2WurKXoQeFSyzoN861zkk6AyupfuCYzuolotciAan3MrdROEO2LXz8IdZq4aP6cdVI0yPxq6aU7XY2HDqX8dvqd9ovI3zGgdzCDgtVQJ0SQqlEsTsML_WlFld_eWL_7aKEXiK9MJguypGvXyDQCPixObM2ipxXqAHc0SquMeIdPzrAt2KonF0j6viO_TyOm4XCosx37QdxqOlhiXze7cvMidVfeMSx0BMO-KXbyS-YJus6tcaI"
+    name: "Local User",
+    email: "",
+    avatarUrl: ""
   };
 };
 

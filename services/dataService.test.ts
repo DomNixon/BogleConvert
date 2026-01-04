@@ -1,5 +1,27 @@
+/*
+ * Copyright (c) 2026 Mid Michigan Connections LLC.
+ * This file is part of BogleConvert.
+ *
+ * BogleConvert is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, version 3 of the License.
+ *
+ * BogleConvert is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License along
+ * with BogleConvert. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 import { describe, it, expect } from 'vitest';
-import { getCumulativeInflation, calculateStats } from './dataService';
+import {
+    getCumulativeInflation,
+    calculateStats,
+    mergeStockIntoPortfolio,
+    mergePortfolios,
+    getChartData
+} from './dataService';
 import { StockPosition } from '../types';
 
 /**
@@ -238,3 +260,531 @@ describe('Financial Logic - Reality Checks', () => {
         expect(result2.cagr).toBe(0);
     });
 });
+
+/**
+ * PORTFOLIO MERGE LOGIC TEST SUITE
+ * 
+ * These tests verify that merging portfolios correctly calculates:
+ * - Weighted average cost basis
+ * - Total share count
+ * - Weighted average years held
+ */
+
+describe('Portfolio Merge Logic', () => {
+
+    /**
+     * TEST 1: Weighted Average Cost Calculation
+     * 
+     * Scenario: Merge two lots of the same stock with different cost bases
+     * Lot 1: 100 shares @ $50 = $5,000
+     * Lot 2: 50 shares @ $80 = $4,000
+     * Expected: 150 shares @ weighted avg of ($5,000 + $4,000) / 150 = $60
+     */
+    it('should calculate weighted average cost correctly when merging', () => {
+        const existingStock: StockPosition = {
+            ticker: 'TEST',
+            name: 'Test Stock',
+            avgCost: 50,
+            currentPrice: 100,
+            shares: 100,
+            yearsHeld: 3,
+            nominalReturn: 0,
+            inflationAdjReturn: 0,
+            status: 'Tracking Market',
+            sector: 'Test',
+            weight: 0,
+            cagr: 0
+        };
+
+        const newStock: StockPosition = {
+            ticker: 'TEST',
+            name: 'Test Stock',
+            avgCost: 80,
+            currentPrice: 100,
+            shares: 50,
+            yearsHeld: 1,
+            nominalReturn: 0,
+            inflationAdjReturn: 0,
+            status: 'Tracking Market',
+            sector: 'Test',
+            weight: 0,
+            cagr: 0
+        };
+
+        const result = mergeStockIntoPortfolio([existingStock], newStock);
+
+        expect(result.length).toBe(1);
+        expect(result[0].shares).toBe(150);
+
+        // Weighted avg: (100*50 + 50*80) / 150 = (5000 + 4000) / 150 = 60
+        expect(result[0].avgCost).toBe(60);
+    });
+
+    /**
+     * TEST 2: Total Shares Addition
+     * 
+     * Verify that shares are correctly summed, not replaced
+     */
+    it('should add shares together when merging same ticker', () => {
+        const lot1: StockPosition = {
+            ticker: 'AAPL',
+            name: 'Apple',
+            avgCost: 100,
+            currentPrice: 150,
+            shares: 25,
+            yearsHeld: 2,
+            nominalReturn: 0,
+            inflationAdjReturn: 0,
+            status: 'Tracking Market',
+            sector: 'Tech',
+            weight: 0,
+            cagr: 0
+        };
+
+        const lot2: StockPosition = {
+            ticker: 'aapl', // Test case insensitivity
+            name: 'Apple Inc.',
+            avgCost: 120,
+            currentPrice: 150,
+            shares: 75,
+            yearsHeld: 1,
+            nominalReturn: 0,
+            inflationAdjReturn: 0,
+            status: 'Tracking Market',
+            sector: 'Tech',
+            weight: 0,
+            cagr: 0
+        };
+
+        const result = mergeStockIntoPortfolio([lot1], lot2);
+
+        expect(result[0].shares).toBe(100); // 25 + 75
+        expect(result[0].ticker).toBe('AAPL'); // Original ticker case preserved
+    });
+
+    /**
+     * TEST 3: Weighted Years Held (CAGR Protection)
+     * 
+     * Years held should be weighted by investment amount to prevent CAGR distortion
+     * Lot 1: $5,000 invested for 4 years
+     * Lot 2: $5,000 invested for 2 years
+     * Expected: Weighted years = (5000*4 + 5000*2) / 10000 = 3 years
+     */
+    it('should calculate weighted average years held', () => {
+        const lot1: StockPosition = {
+            ticker: 'TEST',
+            name: 'Test',
+            avgCost: 50,
+            currentPrice: 100,
+            shares: 100, // $5,000 invested
+            yearsHeld: 4,
+            nominalReturn: 0,
+            inflationAdjReturn: 0,
+            status: 'Tracking Market',
+            sector: 'Test',
+            weight: 0,
+            cagr: 0
+        };
+
+        const lot2: StockPosition = {
+            ticker: 'TEST',
+            name: 'Test',
+            avgCost: 100, // Same $5,000 invested but at higher cost
+            currentPrice: 100,
+            shares: 50,
+            yearsHeld: 2,
+            nominalReturn: 0,
+            inflationAdjReturn: 0,
+            status: 'Tracking Market',
+            sector: 'Test',
+            weight: 0,
+            cagr: 0
+        };
+
+        const result = mergeStockIntoPortfolio([lot1], lot2);
+
+        // Weighted: (5000*4 + 5000*2) / 10000 = 3.0 years
+        expect(result[0].yearsHeld).toBe(3);
+    });
+
+    /**
+     * TEST 4: New Stock Addition (No Merge)
+     * 
+     * Adding a different ticker should append, not merge
+     */
+    it('should add new stock to portfolio without merging', () => {
+        const existing: StockPosition = {
+            ticker: 'AAPL',
+            name: 'Apple',
+            avgCost: 100,
+            currentPrice: 150,
+            shares: 50,
+            yearsHeld: 2,
+            nominalReturn: 0,
+            inflationAdjReturn: 0,
+            status: 'Tracking Market',
+            sector: 'Tech',
+            weight: 0,
+            cagr: 0
+        };
+
+        const newStock: StockPosition = {
+            ticker: 'GOOGL',
+            name: 'Alphabet',
+            avgCost: 100,
+            currentPrice: 150,
+            shares: 30,
+            yearsHeld: 1,
+            nominalReturn: 0,
+            inflationAdjReturn: 0,
+            status: 'Tracking Market',
+            sector: 'Tech',
+            weight: 0,
+            cagr: 0
+        };
+
+        const result = mergeStockIntoPortfolio([existing], newStock);
+
+        expect(result.length).toBe(2);
+        expect(result[0].ticker).toBe('AAPL');
+        expect(result[1].ticker).toBe('GOOGL');
+    });
+
+    /**
+     * TEST 5: Full Portfolio Merge
+     * 
+     * Merge multiple stocks at once via mergePortfolios
+     */
+    it('should merge full portfolios correctly', () => {
+        const portfolio1: StockPosition[] = [
+            {
+                ticker: 'AAPL', name: 'Apple', avgCost: 100, currentPrice: 150,
+                shares: 50, yearsHeld: 2, nominalReturn: 0, inflationAdjReturn: 0,
+                status: 'Tracking Market', sector: 'Tech', weight: 0, cagr: 0
+            }
+        ];
+
+        const portfolio2: StockPosition[] = [
+            {
+                ticker: 'AAPL', name: 'Apple', avgCost: 120, currentPrice: 150,
+                shares: 50, yearsHeld: 1, nominalReturn: 0, inflationAdjReturn: 0,
+                status: 'Tracking Market', sector: 'Tech', weight: 0, cagr: 0
+            },
+            {
+                ticker: 'MSFT', name: 'Microsoft', avgCost: 200, currentPrice: 300,
+                shares: 25, yearsHeld: 3, nominalReturn: 0, inflationAdjReturn: 0,
+                status: 'Tracking Market', sector: 'Tech', weight: 0, cagr: 0
+            }
+        ];
+
+        const result = mergePortfolios(portfolio1, portfolio2);
+
+        expect(result.length).toBe(2);
+
+        const apple = result.find(s => s.ticker === 'AAPL');
+        const msft = result.find(s => s.ticker === 'MSFT');
+
+        expect(apple?.shares).toBe(100); // 50 + 50
+        // Weighted avg: (50*100 + 50*120) / 100 = 110
+        expect(apple?.avgCost).toBe(110);
+
+        expect(msft?.shares).toBe(25);
+        expect(msft?.avgCost).toBe(200);
+    });
+});
+
+/**
+ * STATUS CLASSIFICATION TEST SUITE
+ * 
+ * These tests verify the thresholds for status labels:
+ * - Beating Inflation: Real Return >= 1%
+ * - Tracking Market: Real Return between -1% and 1%
+ * - Losing Power: Real Return < -1%
+ */
+
+describe('Status Classification Thresholds', () => {
+
+    /**
+     * TEST 1: Beating Inflation Threshold
+     */
+    it('should classify as "Beating Inflation" when real return >= 1%', () => {
+        // High return stock - should easily beat inflation
+        const stock: StockPosition = {
+            ticker: 'TEST',
+            name: 'Test',
+            avgCost: 100,
+            currentPrice: 130, // 30% nominal gain
+            shares: 10,
+            yearsHeld: 2,
+            nominalReturn: 0,
+            inflationAdjReturn: 0,
+            status: 'Tracking Market',
+            sector: 'Test',
+            weight: 0,
+            cagr: 0
+        };
+
+        const result = calculateStats(stock);
+
+        // With 30% nominal and ~5-6% inflation over 2 years, real return should be ~24%
+        expect(result.inflationAdjReturn).toBeGreaterThan(1);
+        expect(result.status).toBe('Beating Inflation');
+    });
+
+    /**
+     * TEST 2: Tracking Market Threshold (near-zero real return)
+     */
+    it('should classify as "Tracking Market" when real return is between -1% and 1%', () => {
+        // Stock that roughly matches inflation
+        // We need to find a price that gives ~0% real return
+        // If 2-year inflation is ~5%, then 105% nominal = 0% real
+        const inflation2Year = getCumulativeInflation(2);
+        const breakEvenPrice = 100 * (1 + inflation2Year); // Price that matches inflation exactly
+
+        const stock: StockPosition = {
+            ticker: 'TEST',
+            name: 'Test',
+            avgCost: 100,
+            currentPrice: breakEvenPrice,
+            shares: 10,
+            yearsHeld: 2,
+            nominalReturn: 0,
+            inflationAdjReturn: 0,
+            status: 'Beating Inflation', // Will be recalculated
+            sector: 'Test',
+            weight: 0,
+            cagr: 0
+        };
+
+        const result = calculateStats(stock);
+
+        // Real return should be approximately 0%
+        expect(result.inflationAdjReturn).toBeGreaterThanOrEqual(-1);
+        expect(result.inflationAdjReturn).toBeLessThanOrEqual(1);
+        expect(result.status).toBe('Tracking Market');
+    });
+
+    /**
+     * TEST 3: Losing Power Threshold
+     */
+    it('should classify as "Losing Power" when real return < -1%', () => {
+        // Stock that lost money or barely gained (less than inflation)
+        const stock: StockPosition = {
+            ticker: 'TEST',
+            name: 'Test',
+            avgCost: 100,
+            currentPrice: 95, // 5% loss nominal
+            shares: 10,
+            yearsHeld: 2,
+            nominalReturn: 0,
+            inflationAdjReturn: 0,
+            status: 'Tracking Market',
+            sector: 'Test',
+            weight: 0,
+            cagr: 0
+        };
+
+        const result = calculateStats(stock);
+
+        // With -5% nominal and +5% inflation, real return is roughly -10%
+        expect(result.inflationAdjReturn).toBeLessThan(-1);
+        expect(result.status).toBe('Losing Power');
+    });
+
+    /**
+     * TEST 4: Edge case - Exactly at boundaries
+     */
+    it('should handle boundary values correctly', () => {
+        // Test exactly at +1% boundary (should be "Beating Inflation")
+        const stock1: StockPosition = {
+            ticker: 'TEST',
+            name: 'Test',
+            avgCost: 100,
+            currentPrice: 100, // Will be adjusted
+            shares: 10,
+            yearsHeld: 1,
+            nominalReturn: 0,
+            inflationAdjReturn: 0,
+            status: 'Tracking Market',
+            sector: 'Test',
+            weight: 0,
+            cagr: 0
+        };
+
+        // Calculate what price gives exactly 1% real return
+        const inflation1Year = getCumulativeInflation(1);
+        // Real = ((1+N)/(1+I)) - 1 = 0.01
+        // (1+N) = 1.01 * (1+I)
+        // N = 1.01 * (1+I) - 1
+        const exactNominalFor1PercentReal = 1.01 * (1 + inflation1Year) - 1;
+        stock1.currentPrice = 100 * (1 + exactNominalFor1PercentReal);
+
+        const result1 = calculateStats(stock1);
+
+        expect(result1.inflationAdjReturn).toBeCloseTo(1.0, 0);
+        expect(result1.status).toBe('Beating Inflation');
+    });
+});
+
+/**
+ * CHART DATA GENERATION TEST SUITE
+ * 
+ * These tests verify chart data accuracy:
+ * - Year range calculation
+ * - Portfolio index normalization
+ * - Benchmark alignment
+ */
+
+describe('Chart Data Generation', () => {
+
+    /**
+     * TEST 1: Chart should start at year based on longest holding
+     */
+    it('should calculate chart start year based on longest holding', async () => {
+        const portfolio: StockPosition[] = [
+            {
+                ticker: 'TEST',
+                name: 'Test',
+                avgCost: 100,
+                currentPrice: 150,
+                shares: 10,
+                yearsHeld: 5, // Longest holding
+                nominalReturn: 50,
+                inflationAdjReturn: 40,
+                status: 'Beating Inflation',
+                sector: 'Test',
+                weight: 100,
+                cagr: 8.5
+            }
+        ];
+
+        const chartData = await getChartData(portfolio, 'VT');
+        const currentYear = new Date().getFullYear();
+
+        // Should have at least 5 years of data (or clamped to VT inception 2008)
+        expect(chartData.length).toBeGreaterThanOrEqual(5);
+
+        // Last data point should be current year
+        expect(chartData[chartData.length - 1].date).toBe(String(currentYear));
+    });
+
+    /**
+     * TEST 2: Chart indices should start at 0% growth
+     */
+    it('should normalize chart data to start at 0% growth', async () => {
+        const portfolio: StockPosition[] = [
+            {
+                ticker: 'TEST',
+                name: 'Test',
+                avgCost: 100,
+                currentPrice: 120,
+                shares: 10,
+                yearsHeld: 3,
+                nominalReturn: 20,
+                inflationAdjReturn: 15,
+                status: 'Beating Inflation',
+                sector: 'Test',
+                weight: 100,
+                cagr: 6.3
+            }
+        ];
+
+        const chartData = await getChartData(portfolio, 'VT');
+
+        // First data point should show 0% growth (normalized baseline)
+        expect(chartData[0].portfolio).toBe(0);
+        expect(chartData[0].benchmark).toBe(0);
+        expect(chartData[0].inflation).toBe(0);
+    });
+
+    /**
+     * TEST 3: Empty portfolio should still generate benchmark/inflation data
+     */
+    it('should generate chart with benchmark data for empty portfolio', async () => {
+        const chartData = await getChartData([], 'VT');
+
+        // Should have at least 2 years (minimum for line chart)
+        expect(chartData.length).toBeGreaterThanOrEqual(2);
+
+        // Benchmark should show some growth over time
+        const lastPoint = chartData[chartData.length - 1];
+        // Don't assert specific values as they depend on historical data
+        // Just verify structure
+        expect(lastPoint).toHaveProperty('date');
+        expect(lastPoint).toHaveProperty('portfolio');
+        expect(lastPoint).toHaveProperty('benchmark');
+        expect(lastPoint).toHaveProperty('inflation');
+    });
+
+    /**
+     * TEST 4: Different benchmarks should produce different data
+     */
+    it('should produce different results for VT vs VTI vs VOO', async () => {
+        const portfolio: StockPosition[] = [
+            {
+                ticker: 'TEST',
+                name: 'Test',
+                avgCost: 100,
+                currentPrice: 150,
+                shares: 10,
+                yearsHeld: 5,
+                nominalReturn: 50,
+                inflationAdjReturn: 40,
+                status: 'Beating Inflation',
+                sector: 'Test',
+                weight: 100,
+                cagr: 8.5
+            }
+        ];
+
+        const vtData = await getChartData(portfolio, 'VT');
+        const vtiData = await getChartData(portfolio, 'VTI');
+        const vooData = await getChartData(portfolio, 'VOO');
+
+        // All should have same number of data points
+        expect(vtData.length).toBe(vtiData.length);
+        expect(vtiData.length).toBe(vooData.length);
+
+        // Benchmark values should differ (VTI/VOO historically outperformed VT)
+        const vtBenchEnd = vtData[vtData.length - 1].benchmark;
+        const vtiBenchEnd = vtiData[vtiData.length - 1].benchmark;
+
+        // Just verify they're different (exact values depend on historical data)
+        // VTI should typically show higher returns than VT in recent years
+        expect(vtiBenchEnd).not.toBe(vtBenchEnd);
+    });
+
+    /**
+     * TEST 5: Chart should respect VT inception year (2008) as minimum
+     */
+    it('should clamp start year to 2008 (VT inception)', async () => {
+        const portfolio: StockPosition[] = [
+            {
+                ticker: 'TEST',
+                name: 'Test',
+                avgCost: 100,
+                currentPrice: 500,
+                shares: 10,
+                yearsHeld: 30, // 30 years - older than VT
+                nominalReturn: 400,
+                inflationAdjReturn: 300,
+                status: 'Beating Inflation',
+                sector: 'Test',
+                weight: 100,
+                cagr: 5.5
+            }
+        ];
+
+        const chartData = await getChartData(portfolio, 'VT');
+        const currentYear = new Date().getFullYear();
+
+        // First year should be no earlier than 2008
+        const firstYear = parseInt(chartData[0].date);
+        expect(firstYear).toBeGreaterThanOrEqual(2008);
+
+        // Should have data from 2008 to current year
+        const expectedYears = currentYear - 2008 + 1;
+        expect(chartData.length).toBe(expectedYears);
+    });
+});
+

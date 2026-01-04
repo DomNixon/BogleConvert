@@ -16,7 +16,7 @@ The project meets all specified legal requirements for production distribution u
 | **Copyright** | ✅ PASS | Headers and `README.md` correctly cite `Copyright (c) 2026 Mid Michigan Connections LLC`. |
 | **Governance** | ✅ PASS | `GOVERNANCE.md` includes the **Succession Pledge** (Kill Switch). |
 | **Contribution** | ✅ PASS | `CONTRIBUTING.md` includes the **CLA** requirement. |
-| **Author Info** | ✅ PASS | Dominic Nixon <github@midmichiganconnections.com> is cited correctly. |
+| **Author Info** | ✅ PASS | Mid Michigan Connections LLC is cited correctly. |
 
 **Recommendation:**
 - Ensure all new source files created in the future automatically include the standard license header.

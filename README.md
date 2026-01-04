@@ -102,10 +102,25 @@ This design ensures:
 ### Running Tests
 
 ```bash
+# Run all tests
 npm test
+
+# Run tests with coverage
+npx vitest run --coverage
 ```
 
-For detailed test results and financial accuracy audit, see [Documentation/AUDIT_MATH.md](./Documentation/AUDIT_MATH.md).
+#### Test Suite Overview (19 Tests)
+
+| Suite | Tests | What It Validates |
+|-------|-------|-------------------|
+| Financial Logic - Reality Checks | 5 | CAGR formula, inflation compounding, date handling |
+| Portfolio Merge Logic | 5 | Weighted avg cost, share addition, years held weighting |
+| Status Classification Thresholds | 4 | "Beating Inflation" / "Tracking Market" / "Losing Power" |
+| Chart Data Generation | 5 | Year range, normalization, benchmark differentiation |
+
+For complete test documentation, see [Documentation/TESTING.md](./Documentation/TESTING.md).
+
+For financial accuracy audit, see [Documentation/AUDIT_MATH.md](./Documentation/AUDIT_MATH.md).
 
 ---
 
@@ -127,6 +142,7 @@ Your app will be available at `https://your-project.pages.dev` or your custom do
 ## 📖 Documentation
 
 - **[ENV_SETUP.md](./Documentation/ENV_SETUP.md)** - Environment variable configuration guide
+- **[TESTING.md](./Documentation/TESTING.md)** - Complete test suite documentation and coverage report
 - **[AUDIT_MATH.md](./Documentation/AUDIT_MATH.md)** - Financial calculation verification and test results
 - **[AUDIT_PRODUCTION.md](./Documentation/AUDIT_PRODUCTION.md)** - Production readiness audit and security review
 

@@ -1,3 +1,18 @@
+/*
+ * Copyright (c) 2026 Mid Michigan Connections LLC.
+ * This file is part of BogleConvert.
+ *
+ * BogleConvert is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Affero General Public License as published by the Free
+ * Software Foundation, version 3 of the License.
+ *
+ * BogleConvert is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License along
+ * with BogleConvert. If not, see <https://www.gnu.org/licenses/>.
+ */
 
 import React from 'react';
 
@@ -48,7 +63,7 @@ const HelpAbout: React.FC = () => {
                             </li>
                             <li className="flex items-start gap-4">
                                 <div className="w-4 h-4 rounded-full mt-1 flex-shrink-0" style={{ backgroundColor: '#64748b' }}></div>
-                                <span><span style={{ color: '#64748b' }} className="font-bold">The Gray Line (Benchmark VT):</span> This is what your money could have done in a total world stock index fund.</span>
+                                <span><span style={{ color: '#64748b' }} className="font-bold">The Gray Line (Benchmark):</span> This is what your money could have done in the selected index fund (VT, VTI, or VOO).</span>
                             </li>
                             <li className="flex items-start gap-4">
                                 <div className="w-4 h-4 rounded-full mt-1 flex-shrink-0 border-2 border-dashed border-[#4ade80] bg-transparent"></div>
@@ -59,7 +74,7 @@ const HelpAbout: React.FC = () => {
                             <p className="text-gray-300 font-medium">What the status labels mean:</p>
                             <ul className="space-y-2 text-sm text-gray-400">
                                 <li>
-                                    <span style={{ color: '#4ade80' }} className="font-bold">Beating Inflation:</span> Real Return &gt; 1%. You are gaining purchasing power.
+                                    <span style={{ color: '#4ade80' }} className="font-bold">Beating Inflation:</span> Real Return ≥ 1%. You are gaining purchasing power.
                                 </li>
                                 <li>
                                     <span className="text-gray-400 font-bold">Tracking Market:</span> Real Return between -1% and 1%. You are preserving wealth but not significantly outperforming.
