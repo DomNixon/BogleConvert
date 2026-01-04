@@ -200,12 +200,10 @@ const StockReport: React.FC<StockReportProps> = ({ portfolio, initialTicker = "A
                                         <p className="text-muted text-sm font-medium leading-normal mb-2">Current Price</p>
                                         <div className="flex items-baseline justify-center gap-3">
                                             <p className="text-white tracking-light text-4xl font-bold font-display leading-tight">{CURRENCY_FORMATTER.format(displayData.price)}</p>
-                                            {displayData.change !== undefined ? (
+                                            {displayData.change !== undefined && (
                                                 <p className={`${displayData.change >= 0 ? 'text-positive' : 'text-negative'} text-lg font-medium leading-normal`}>
                                                     {displayData.change > 0 ? '+' : ''}{displayData.change}%
                                                 </p>
-                                            ) : (
-                                                <p className="text-muted text-lg font-medium leading-normal">--</p>
                                             )}
                                         </div>
                                     </div>
@@ -273,6 +271,17 @@ const StockReport: React.FC<StockReportProps> = ({ portfolio, initialTicker = "A
                                                 <p className="text-secondary tracking-light text-2xl font-bold font-display leading-tight">Diversified</p>
                                             </div>
                                             <p className="text-xs text-muted max-w-[200px] leading-relaxed">Broad market exposure. The cornerstone of a passive portfolio.</p>
+                                        </div>
+                                    ) : displayData.sector === 'Unknown' ? (
+                                        <div className="flex flex-col items-center gap-2 animate-in fade-in zoom-in duration-500">
+                                            <div className="p-3 rounded-full bg-muted/10 text-muted mb-1">
+                                                <span className="material-symbols-outlined text-3xl">help_outline</span>
+                                            </div>
+                                            <div>
+                                                <p className="text-muted text-sm font-medium leading-normal mb-1">Bogle Speculation Meter</p>
+                                                <p className="text-muted tracking-light text-2xl font-bold font-display leading-tight">Data Unavailable</p>
+                                            </div>
+                                            <p className="text-xs text-muted max-w-[200px] leading-relaxed">Sector data not found. Unable to classify this security.</p>
                                         </div>
                                     ) : (
                                         <div className="flex flex-col items-center gap-2 animate-in fade-in zoom-in duration-500">
@@ -346,6 +355,18 @@ const StockReport: React.FC<StockReportProps> = ({ portfolio, initialTicker = "A
                                         </div>
                                         <p className="text-sm text-muted text-center">This represents a gain of <span className="font-semibold text-gray-200">{CURRENCY_FORMATTER.format(gainOverMarket)}</span> over holding the market index.</p>
                                     </div>
+                                </div>
+                            )}
+
+                            {/* Fallback Data Warning - Non-intrusive */}
+                            {(displayData.sector === 'Unknown' || displayData.price === 0) && (
+                                <div className="flex items-center gap-2 rounded-lg bg-white/5 border border-outline/50 p-3 text-muted animate-in fade-in duration-500">
+                                    <span className="material-symbols-outlined text-base">info</span>
+                                    <p className="text-xs leading-relaxed">
+                                        Some data for this ticker may be incomplete or unavailable.
+                                        {displayData.price === 0 && ' Price data not found.'}
+                                        {displayData.sector === 'Unknown' && ' Sector classification not available.'}
+                                    </p>
                                 </div>
                             )}
 

@@ -16,10 +16,10 @@
 
 import React, { useState } from 'react';
 import { Turnstile } from '@marsidev/react-turnstile';
+import { GITHUB_REPO_URL } from '../constants';
 
 const SupportPage: React.FC = () => {
     const stripeUrl = import.meta.env.VITE_STRIPE_URL;
-    const githubRepo = import.meta.env.VITE_GITHUB_REPO;
     const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
     // BTC Email protection state
@@ -96,9 +96,9 @@ const SupportPage: React.FC = () => {
             title: 'Contribute to the Code',
             icon: 'code',
             description: 'Help improve BogleConvert by contributing to our open-source repository',
-            value: githubRepo,
+            value: GITHUB_REPO_URL,
             buttonText: 'View on GitHub',
-            action: () => githubRepo && window.open(githubRepo, '_blank'),
+            action: () => window.open(GITHUB_REPO_URL, '_blank'),
             gradient: 'from-purple-500/20 to-pink-600/20',
             border: 'border-purple-500/20',
             iconColor: 'text-purple-400'
@@ -130,7 +130,7 @@ const SupportPage: React.FC = () => {
                     {supportOptions.map((option) => (
                         <div
                             key={option.id}
-                            className={`rounded-lg bg-gradient-to-br ${option.gradient} p-6 border ${option.border} transition-all hover:scale-105`}
+                            className={`rounded-lg bg-gradient-to-br ${option.gradient} p-6 border ${option.border} transition-all hover:scale-105 flex flex-col`}
                         >
                             {/* Icon & Title */}
                             <div className="mb-4 flex items-center gap-3">
@@ -143,41 +143,28 @@ const SupportPage: React.FC = () => {
                             </div>
 
                             {/* Description */}
-                            <p className="mb-4 text-sm text-muted leading-relaxed">
+                            <p className="mb-4 text-sm text-muted leading-relaxed flex-grow">
                                 {option.description}
                             </p>
 
-                            {/* Value Display or Not Configured */}
-                            {option.value ? (
-                                <div className="mb-4 rounded bg-black/20 p-3">
-                                    <p className="text-xs text-muted break-all font-mono">
-                                        {option.value}
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="mb-4 rounded bg-black/20 p-3">
-                                    <p className="text-xs text-muted/50 italic">
-                                        Not configured yet
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Action Button */}
-                            <button
-                                onClick={option.action}
-                                disabled={!option.value}
-                                className={`w-full rounded-md py-2.5 text-sm font-semibold transition-all ${option.value
-                                    ? 'bg-white text-black hover:bg-gray-100'
-                                    : 'bg-white/10 text-muted cursor-not-allowed'
-                                    }`}
-                            >
-                                {option.buttonText}
-                            </button>
+                            {/* Action Button - mt-auto pushes to bottom */}
+                            <div className="mt-auto">
+                                <button
+                                    onClick={option.action}
+                                    disabled={!option.value}
+                                    className={`w-full rounded-md py-2.5 text-sm font-semibold transition-all ${option.value
+                                        ? 'bg-white text-black hover:bg-gray-100'
+                                        : 'bg-white/10 text-muted cursor-not-allowed'
+                                        }`}
+                                >
+                                    {option.buttonText}
+                                </button>
+                            </div>
                         </div>
                     ))}
 
                     {/* Bitcoin - Protected with Turnstile */}
-                    <div className="rounded-lg bg-gradient-to-br from-orange-500/20 to-amber-600/20 p-6 border border-orange-500/20 transition-all hover:scale-105">
+                    <div className="rounded-lg bg-gradient-to-br from-orange-500/20 to-amber-600/20 p-6 border border-orange-500/20 transition-all hover:scale-105 flex flex-col">
                         {/* Icon & Title */}
                         <div className="mb-4 flex items-center gap-3">
                             <span className="material-symbols-outlined text-4xl text-orange-400">
@@ -189,99 +176,94 @@ const SupportPage: React.FC = () => {
                         </div>
 
                         {/* Description */}
-                        <p className="mb-4 text-sm text-muted leading-relaxed">
+                        <p className="mb-4 text-sm text-muted leading-relaxed flex-grow">
                             Send Bitcoin directly to our Proton email address
                         </p>
 
-                        {/* Dynamic Content Based on State */}
-                        <div className="mb-4 rounded bg-black/20 p-3 min-h-[60px] flex items-center justify-center">
+                        {/* Dynamic Content - Only show when not hidden */}
+                        {btcState !== 'hidden' && (
+                            <div className="mb-4 rounded bg-black/20 p-3 min-h-[60px] flex items-center justify-center">
+                                {btcState === 'challenge' && turnstileSiteKey && (
+                                    <div className="w-full flex justify-center">
+                                        <Turnstile
+                                            siteKey={turnstileSiteKey}
+                                            onSuccess={handleTurnstileSuccess}
+                                            onError={() => {
+                                                setErrorMessage('Challenge failed. Please try again.');
+                                                setBtcState('error');
+                                            }}
+                                            options={{
+                                                theme: 'dark',
+                                                size: 'normal',
+                                            }}
+                                        />
+                                    </div>
+                                )}
+
+                                {btcState === 'loading' && (
+                                    <div className="flex items-center gap-2 text-xs text-muted">
+                                        <span className="material-symbols-outlined text-sm animate-spin">
+                                            progress_activity
+                                        </span>
+                                        <span>Verifying...</span>
+                                    </div>
+                                )}
+
+                                {btcState === 'revealed' && (
+                                    <p className="text-xs text-muted break-all font-mono">
+                                        {btcEmail}
+                                    </p>
+                                )}
+
+                                {btcState === 'error' && (
+                                    <div className="text-xs text-red-400 text-center">
+                                        <span className="material-symbols-outlined text-sm mb-1">
+                                            error
+                                        </span>
+                                        <p>{errorMessage}</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Action Button - mt-auto pushes to bottom */}
+                        <div className="mt-auto">
                             {btcState === 'hidden' && (
-                                <div className="flex items-center gap-2 text-xs text-muted">
-                                    <span className="material-symbols-outlined text-sm text-orange-400">
-                                        security
-                                    </span>
-                                    <span>Protected by Cloudflare Turnstile</span>
-                                </div>
-                            )}
-
-                            {btcState === 'challenge' && turnstileSiteKey && (
-                                <div className="w-full flex justify-center">
-                                    <Turnstile
-                                        siteKey={turnstileSiteKey}
-                                        onSuccess={handleTurnstileSuccess}
-                                        onError={() => {
-                                            setErrorMessage('Challenge failed. Please try again.');
-                                            setBtcState('error');
-                                        }}
-                                        options={{
-                                            theme: 'dark',
-                                            size: 'normal',
-                                        }}
-                                    />
-                                </div>
-                            )}
-
-                            {btcState === 'loading' && (
-                                <div className="flex items-center gap-2 text-xs text-muted">
-                                    <span className="material-symbols-outlined text-sm animate-spin">
-                                        progress_activity
-                                    </span>
-                                    <span>Verifying...</span>
-                                </div>
+                                <button
+                                    onClick={handleRevealEmail}
+                                    className="w-full rounded-md py-2.5 text-sm font-semibold transition-all bg-white text-black hover:bg-gray-100"
+                                >
+                                    Reveal Email
+                                </button>
                             )}
 
                             {btcState === 'revealed' && (
-                                <p className="text-xs text-muted break-all font-mono">
-                                    {btcEmail}
-                                </p>
+                                <button
+                                    onClick={handleCopyEmail}
+                                    className="w-full rounded-md py-2.5 text-sm font-semibold transition-all bg-white text-black hover:bg-gray-100"
+                                >
+                                    Copy BTC Email
+                                </button>
                             )}
 
                             {btcState === 'error' && (
-                                <div className="text-xs text-red-400 text-center">
-                                    <span className="material-symbols-outlined text-sm mb-1">
-                                        error
-                                    </span>
-                                    <p>{errorMessage}</p>
-                                </div>
+                                <button
+                                    onClick={handleRetry}
+                                    className="w-full rounded-md py-2.5 text-sm font-semibold transition-all bg-white text-black hover:bg-gray-100"
+                                >
+                                    Try Again
+                                </button>
+                            )}
+
+                            {(btcState === 'challenge' || btcState === 'loading') && (
+                                <button
+                                    disabled
+                                    className="w-full rounded-md py-2.5 text-sm font-semibold transition-all bg-white/10 text-muted cursor-not-allowed"
+                                >
+                                    {btcState === 'loading' ? 'Verifying...' : 'Complete Challenge'}
+                                </button>
                             )}
                         </div>
-
-                        {/* Action Button */}
-                        {btcState === 'hidden' && (
-                            <button
-                                onClick={handleRevealEmail}
-                                className="w-full rounded-md py-2.5 text-sm font-semibold transition-all bg-white text-black hover:bg-gray-100"
-                            >
-                                Reveal Email
-                            </button>
-                        )}
-
-                        {btcState === 'revealed' && (
-                            <button
-                                onClick={handleCopyEmail}
-                                className="w-full rounded-md py-2.5 text-sm font-semibold transition-all bg-white text-black hover:bg-gray-100"
-                            >
-                                Copy BTC Email
-                            </button>
-                        )}
-
-                        {btcState === 'error' && (
-                            <button
-                                onClick={handleRetry}
-                                className="w-full rounded-md py-2.5 text-sm font-semibold transition-all bg-white text-black hover:bg-gray-100"
-                            >
-                                Try Again
-                            </button>
-                        )}
-
-                        {(btcState === 'challenge' || btcState === 'loading') && (
-                            <button
-                                disabled
-                                className="w-full rounded-md py-2.5 text-sm font-semibold transition-all bg-white/10 text-muted cursor-not-allowed"
-                            >
-                                {btcState === 'loading' ? 'Verifying...' : 'Complete Challenge'}
-                            </button>
-                        )}
                     </div>
                 </div>
 

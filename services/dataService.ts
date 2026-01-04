@@ -15,6 +15,18 @@
  */
 
 import { StockPosition, ChartDataPoint, UserProfile } from '../types';
+import {
+  HISTORICAL_INFLATION_RATES,
+  VT_ANNUAL_RETURNS,
+  VTI_ANNUAL_RETURNS,
+  VOO_ANNUAL_RETURNS,
+  LAST_DATA_YEAR
+} from '../constants';
+
+// Data Currency Warning
+if (new Date().getFullYear() > LAST_DATA_YEAR) {
+  console.warn(`WARNING: BogleConvert historical data ends in ${LAST_DATA_YEAR}. Please update constants.ts with newer inflation and market return data.`);
+}
 
 // Type for stock quote data returned from API
 export type StockQuote = {
@@ -170,99 +182,7 @@ export const savePortfolio = (portfolio: StockPosition[]): void => {
   }
 };
 
-// Approximate Historical US Inflation Rates (CPI-U, Year-over-Year)
-const HISTORICAL_INFLATION_RATES: { year: number; rate: number }[] = [
-  { year: 1924, rate: 0.0 }, { year: 1925, rate: 2.3 }, { year: 1926, rate: 1.1 }, { year: 1927, rate: -1.7 }, { year: 1928, rate: -1.7 },
-  { year: 1929, rate: 0.0 }, { year: 1930, rate: -2.3 }, { year: 1931, rate: -9.0 }, { year: 1932, rate: -9.9 }, { year: 1933, rate: -5.1 },
-  { year: 1934, rate: 3.1 }, { year: 1935, rate: 2.2 }, { year: 1936, rate: 1.5 }, { year: 1937, rate: 3.6 }, { year: 1938, rate: -2.1 },
-  { year: 1939, rate: -1.4 }, { year: 1940, rate: 0.7 }, { year: 1941, rate: 5.0 }, { year: 1942, rate: 10.9 }, { year: 1943, rate: 6.1 },
-  { year: 1944, rate: 1.7 }, { year: 1945, rate: 2.3 }, { year: 1946, rate: 8.3 }, { year: 1947, rate: 14.4 }, { year: 1948, rate: 8.1 },
-  { year: 1949, rate: -1.2 }, { year: 1950, rate: 1.3 }, { year: 1951, rate: 7.9 }, { year: 1952, rate: 1.9 }, { year: 1953, rate: 0.8 },
-  { year: 1954, rate: 0.7 }, { year: 1955, rate: -0.4 }, { year: 1956, rate: 1.5 }, { year: 1957, rate: 3.3 }, { year: 1958, rate: 2.8 },
-  { year: 1959, rate: 0.7 }, { year: 1960, rate: 1.7 }, { year: 1961, rate: 1.0 }, { year: 1962, rate: 1.0 }, { year: 1963, rate: 1.3 },
-  { year: 1964, rate: 1.3 }, { year: 1965, rate: 1.6 }, { year: 1966, rate: 2.9 }, { year: 1967, rate: 3.1 }, { year: 1968, rate: 4.2 },
-  { year: 1969, rate: 5.5 }, { year: 1970, rate: 5.7 }, { year: 1971, rate: 4.4 }, { year: 1972, rate: 3.2 }, { year: 1973, rate: 6.2 },
-  { year: 1974, rate: 11.0 }, { year: 1975, rate: 9.1 }, { year: 1976, rate: 5.8 }, { year: 1977, rate: 6.5 }, { year: 1978, rate: 7.6 },
-  { year: 1979, rate: 11.3 }, { year: 1980, rate: 13.5 }, { year: 1981, rate: 10.3 }, { year: 1982, rate: 6.2 }, { year: 1983, rate: 3.2 },
-  { year: 1984, rate: 4.3 }, { year: 1985, rate: 3.6 }, { year: 1986, rate: 1.9 }, { year: 1987, rate: 3.6 }, { year: 1988, rate: 4.1 },
-  { year: 1989, rate: 4.8 }, { year: 1990, rate: 5.4 }, { year: 1991, rate: 4.2 }, { year: 1992, rate: 3.0 }, { year: 1993, rate: 3.0 },
-  { year: 1994, rate: 2.6 }, { year: 1995, rate: 2.8 }, { year: 1996, rate: 3.0 }, { year: 1997, rate: 2.3 }, { year: 1998, rate: 1.6 },
-  { year: 1999, rate: 2.2 }, { year: 2000, rate: 3.4 }, { year: 2001, rate: 2.8 }, { year: 2002, rate: 1.6 }, { year: 2003, rate: 2.3 },
-  { year: 2004, rate: 2.7 }, { year: 2005, rate: 3.4 }, { year: 2006, rate: 3.2 }, { year: 2007, rate: 2.8 }, { year: 2008, rate: 3.8 },
-  { year: 2009, rate: -0.4 }, { year: 2010, rate: 1.6 }, { year: 2011, rate: 3.2 }, { year: 2012, rate: 2.1 }, { year: 2013, rate: 1.5 },
-  { year: 2014, rate: 1.6 }, { year: 2015, rate: 0.1 }, { year: 2016, rate: 1.3 }, { year: 2017, rate: 2.1 }, { year: 2018, rate: 2.4 },
-  { year: 2019, rate: 1.8 }, { year: 2020, rate: 1.2 }, { year: 2021, rate: 4.7 }, { year: 2022, rate: 8.0 }, { year: 2023, rate: 3.4 },
-  { year: 2024, rate: 2.6 }, { year: 2025, rate: 2.7 }, { year: 2026, rate: 2.6 } // 2025: BLS actual, 2026: Federal Reserve/Trading Economics forecast
-];
-
-// Approximate VT (Vanguard Total World Stock ETF) Annual Returns
-const VT_ANNUAL_RETURNS: { year: number; return: number }[] = [
-  { year: 2008, return: -42.0 },
-  { year: 2009, return: 32.7 },
-  { year: 2010, return: 12.8 },
-  { year: 2011, return: -6.4 },
-  { year: 2012, return: 16.7 },
-  { year: 2013, return: 22.8 },
-  { year: 2014, return: 4.0 },
-  { year: 2015, return: -1.9 },
-  { year: 2016, return: 8.7 },
-  { year: 2017, return: 24.0 },
-  { year: 2018, return: -9.8 },
-  { year: 2019, return: 26.9 },
-  { year: 2020, return: 16.3 },
-  { year: 2021, return: 18.0 },
-  { year: 2022, return: -18.0 },
-  { year: 2023, return: 22.0 },
-  { year: 2024, return: 18.2 },
-  { year: 2025, return: 15.5 }, // 2025 actual full-year return
-  { year: 2026, return: 8.0 }, // 2026 YTD estimate (conservative)
-];
-
-// Approximate VTI (Vanguard Total Stock Market ETF) Annual Returns
-const VTI_ANNUAL_RETURNS: { year: number; return: number }[] = [
-  { year: 2008, return: -37.0 },
-  { year: 2009, return: 28.8 },
-  { year: 2010, return: 17.3 },
-  { year: 2011, return: 1.0 },
-  { year: 2012, return: 16.4 },
-  { year: 2013, return: 33.5 },
-  { year: 2014, return: 12.6 },
-  { year: 2015, return: 0.3 },
-  { year: 2016, return: 12.6 },
-  { year: 2017, return: 21.2 },
-  { year: 2018, return: -5.2 },
-  { year: 2019, return: 30.8 },
-  { year: 2020, return: 21.0 },
-  { year: 2021, return: 25.7 },
-  { year: 2022, return: -19.5 },
-  { year: 2023, return: 26.1 },
-  { year: 2024, return: 22.4 },
-  { year: 2025, return: 23.5 }, // 2025 actual full-year return
-  { year: 2026, return: 10.0 }, // 2026 YTD estimate (conservative)
-];
-
-// Approximate VOO (Vanguard S&P 500 ETF) Annual Returns
-const VOO_ANNUAL_RETURNS: { year: number; return: number }[] = [
-  { year: 2008, return: -37.0 },
-  { year: 2009, return: 26.5 },
-  { year: 2010, return: 15.1 },
-  { year: 2011, return: 2.1 },
-  { year: 2012, return: 16.0 },
-  { year: 2013, return: 32.4 },
-  { year: 2014, return: 13.7 },
-  { year: 2015, return: 1.4 },
-  { year: 2016, return: 12.0 },
-  { year: 2017, return: 21.8 },
-  { year: 2018, return: -4.4 },
-  { year: 2019, return: 31.5 },
-  { year: 2020, return: 18.4 },
-  { year: 2021, return: 28.7 },
-  { year: 2022, return: -18.1 },
-  { year: 2023, return: 26.3 },
-  { year: 2024, return: 25.0 },
-  { year: 2025, return: 23.8 }, // 2025 actual full-year return
-  { year: 2026, return: 10.5 }, // 2026 YTD estimate (conservative)
-];
+// Historical data moved to constants.ts
 
 // Master Price Cache (populated once per session or from local storage)
 let MASTER_PRICE_CACHE: Record<string, { price: number; name?: string; sector?: string; industry?: string }> | null = null;
@@ -360,8 +280,6 @@ export const refreshMarketData = async (): Promise<void> => {
 export const fetchStockQuote = async (ticker: string): Promise<StockQuote | null> => {
   if (!ticker) return null;
   const t = ticker.toUpperCase();
-  // Hash for data consistency on unknown tickers (used for mock sector/name generation)
-  const hash = t.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
 
   // Check Cache
   const now = Date.now();
@@ -417,8 +335,8 @@ export const fetchStockQuote = async (ticker: string): Promise<StockQuote | null
 
   if (!name || !sector) {
     const info = knownData[t] || {
-      name: `${t} Inc.`,
-      sector: hash % 2 === 0 ? 'Technology' : 'Consumer'
+      name: t,
+      sector: 'Unknown'
     };
     if (!name) name = info.name;
     if (!sector) sector = info.sector;
@@ -525,147 +443,166 @@ export const getPortfolioData = async (): Promise<StockPosition[]> => {
 };
 
 // Demo portfolio for new users to explore the tool
+// This represents a realistic "Stock Picker's Dilemma" portfolio:
+// - Some picks worked out great, others flopped
+// - Illustrates that stock picking is essentially a coin flip
+// - Even with some winners, poor timing and sizing cause underperformance vs VTI
+// - The message: "Why gamble when you can just own the whole market?"
+// - All prices reflect real-world data as of January 2026
 // NOTE: Weight values are placeholders - they are recalculated on load based on actual values
 export const DEMO_PORTFOLIO: StockPosition[] = [
+  // === THE WINNERS (Got Lucky) ===
   {
-    ticker: "AAPL",
-    name: "Apple Inc.",
-    avgCost: 150.25,
-    currentPrice: 172.50,
-    shares: 100,
-    yearsHeld: 2,
-    nominalReturn: 15.1,
-    inflationAdjReturn: 11.8,
+    // Solid long-term hold - bought before the AI boom
+    ticker: "MSFT",
+    name: "Microsoft Corp",
+    avgCost: 280.00,
+    currentPrice: 473.00,
+    shares: 30,
+    yearsHeld: 4,
+    nominalReturn: 68.9,
+    inflationAdjReturn: 52.5,
     status: "Beating Inflation",
     sector: "Technology",
     weight: 12.0,
-    cagr: 25.8
+    cagr: 14.0
   },
   {
-    ticker: "NVDA",
-    name: "NVIDIA Corp",
-    avgCost: 450.00,
-    currentPrice: 880.00,
-    shares: 50,
-    yearsHeld: 3,
-    nominalReturn: 124.5,
-    inflationAdjReturn: 121.2,
-    status: "Beating Inflation",
-    sector: "Technology",
-    weight: 5.0,
-    cagr: 35.0
-  },
-  {
-    ticker: "MSFT",
-    name: "Microsoft Corp",
-    avgCost: 300.00,
-    currentPrice: 420.00,
-    shares: 75,
-    yearsHeld: 4,
-    nominalReturn: 22.8,
-    inflationAdjReturn: 19.5,
-    status: "Beating Inflation",
-    sector: "Technology",
-    weight: 10.0,
-    cagr: 22.1
-  },
-  {
-    ticker: "GOOGL",
-    name: "Alphabet Inc.",
-    avgCost: 2800.50,
-    currentPrice: 175.00,
-    shares: 10,
-    yearsHeld: 1,
-    nominalReturn: 18.9,
-    inflationAdjReturn: 15.6,
+    // Caught the META comeback after 2022 crash
+    ticker: "META",
+    name: "Meta Platforms",
+    avgCost: 95.00,
+    currentPrice: 650.00,
+    shares: 20,
+    yearsHeld: 2.5,
+    nominalReturn: 584.2,
+    inflationAdjReturn: 550.0,
     status: "Beating Inflation",
     sector: "Communication",
-    weight: 9.2,
-    cagr: 18.0
+    weight: 10.0,
+    cagr: 115.0
   },
   {
+    // Good entry on AMZN post-split
     ticker: "AMZN",
     name: "Amazon.com Inc",
-    avgCost: 130.00,
-    currentPrice: 180.00,
-    shares: 150,
+    avgCost: 85.00,
+    currentPrice: 227.00,
+    shares: 35,
     yearsHeld: 2.5,
-    nominalReturn: 8.3,
-    inflationAdjReturn: 5.0,
+    nominalReturn: 167.1,
+    inflationAdjReturn: 150.5,
     status: "Beating Inflation",
     sector: "Consumer Discretionary",
     weight: 8.0,
-    cagr: 18.5
+    cagr: 48.5
   },
   {
+    // Costco - bought at market high, modest gains
+    ticker: "COST",
+    name: "Costco Wholesale",
+    avgCost: 720.00,
+    currentPrice: 855.00,
+    shares: 10,
+    yearsHeld: 2,
+    nominalReturn: 18.8,
+    inflationAdjReturn: 10.2,
+    status: "Beating Inflation",
+    sector: "Consumer Staples",
+    weight: 7.0,
+    cagr: 9.0
+  },
+  {
+    // Apple - reliable blue chip, strong performance
+    ticker: "AAPL",
+    name: "Apple Inc.",
+    avgCost: 155.00,
+    currentPrice: 271.00,
+    shares: 40,
+    yearsHeld: 3,
+    nominalReturn: 74.8,
+    inflationAdjReturn: 62.0,
+    status: "Beating Inflation",
+    sector: "Technology",
+    weight: 8.0,
+    cagr: 20.5
+  },
+
+  // === THE LOSERS (Bad Luck / Bad Timing) ===
+  {
+    // Bought near the late 2024 peak - gave back gains
     ticker: "TSLA",
     name: "Tesla Inc",
-    avgCost: 200.00,
-    currentPrice: 170.00,
-    shares: 40,
-    yearsHeld: 2,
-    nominalReturn: -15.0,
-    inflationAdjReturn: -18.2,
+    avgCost: 480.00,
+    currentPrice: 438.00,
+    shares: 25,
+    yearsHeld: 1.5,
+    nominalReturn: -8.8,
+    inflationAdjReturn: -14.2,
     status: "Losing Power",
     sector: "Consumer Discretionary",
-    weight: 6.0,
-    cagr: -5.2
+    weight: 9.0,
+    cagr: -5.9
   },
   {
-    ticker: "V",
-    name: "Visa Inc.",
-    avgCost: 200.00,
-    currentPrice: 280.00,
-    shares: 30,
+    // Classic "value trap" - kept averaging down but finally recovering
+    ticker: "INTC",
+    name: "Intel Corp",
+    avgCost: 55.00,
+    currentPrice: 39.00,
+    shares: 150,
+    yearsHeld: 4,
+    nominalReturn: -29.1,
+    inflationAdjReturn: -38.5,
+    status: "Losing Power",
+    sector: "Technology",
+    weight: 8.0,
+    cagr: -8.2
+  },
+  {
+    // Post-COVID pharma disappointment
+    ticker: "PFE",
+    name: "Pfizer Inc.",
+    avgCost: 52.00,
+    currentPrice: 25.00,
+    shares: 100,
     yearsHeld: 3,
-    nominalReturn: 10.0,
-    inflationAdjReturn: 6.5,
-    status: "Beating Inflation",
-    sector: "Financials",
-    weight: 4.0,
-    cagr: 12.0
-  },
-  {
-    ticker: "JNJ",
-    name: "Johnson & Johnson",
-    avgCost: 160.00,
-    currentPrice: 155.00,
-    shares: 60,
-    yearsHeld: 5,
-    nominalReturn: -2.0,
-    inflationAdjReturn: -15.0,
+    nominalReturn: -51.9,
+    inflationAdjReturn: -57.5,
     status: "Losing Power",
     sector: "Healthcare",
-    weight: 3.5,
-    cagr: 2.1
+    weight: 6.0,
+    cagr: -21.5
   },
   {
-    ticker: "META",
-    name: "Meta Platforms",
-    avgCost: 300.00,
-    currentPrice: 480.00,
-    shares: 20,
+    // Disney+ hype that fizzled
+    ticker: "DIS",
+    name: "Walt Disney Co",
+    avgCost: 175.00,
+    currentPrice: 112.00,
+    shares: 35,
     yearsHeld: 3,
-    nominalReturn: 60.0,
-    inflationAdjReturn: 52.0,
-    status: "Beating Inflation",
+    nominalReturn: -36.0,
+    inflationAdjReturn: -43.0,
+    status: "Losing Power",
     sector: "Communication",
-    weight: 3.0,
-    cagr: 28.0
+    weight: 5.0,
+    cagr: -13.5
   },
   {
-    ticker: "GLD",
-    name: "SPDR Gold Shares",
-    avgCost: 210.00,
-    currentPrice: 216.00,
-    shares: 15,
-    yearsHeld: 2,
-    nominalReturn: 17.1,
-    inflationAdjReturn: 10.5,
-    status: "Beating Inflation",
-    sector: "Commodity",
-    weight: 2.5,
-    cagr: 8.2
+    // "Safe" dividend stock that underperformed
+    ticker: "VZ",
+    name: "Verizon Communications",
+    avgCost: 55.00,
+    currentPrice: 40.50,
+    shares: 80,
+    yearsHeld: 4,
+    nominalReturn: -26.4,
+    inflationAdjReturn: -36.0,
+    status: "Losing Power",
+    sector: "Communication",
+    weight: 4.0,
+    cagr: -7.4
   }
 ];
 
@@ -683,8 +620,10 @@ export const getChartData = async (
     : 0;
 
   // Calculate start year relative to now
+  // Shift back by 1 additional year to create a baseline year at 0% growth
+  // This ensures the first year's returns (e.g., 2022 drawdown) are visible
   // Ensure minimum 2 years for proper chart rendering (empty or very new portfolios)
-  let calculatedStartYear = currentYear - Math.max(Math.ceil(maxYearsHeld), 2);
+  let calculatedStartYear = currentYear - Math.max(Math.ceil(maxYearsHeld), 2) - 1;
 
   // Clamp start year to VT Inception (2008)
   // This prevents data being pulled/shown older than the benchmark
@@ -787,6 +726,7 @@ export const getChartData = async (
     const benchRate = relevantBenchmark.find(r => r.year === year)?.return || 7.0;
 
     // Apply compound growth for subsequent years (i > 0)
+    // Year 0 is the baseline (0% growth), subsequent years show actual returns
     if (i > 0) {
       inflationIndex = inflationIndex * (1 + (infRate / 100));
       benchmarkIndex = benchmarkIndex * (1 + (benchRate / 100));

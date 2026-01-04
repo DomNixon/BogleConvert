@@ -16,6 +16,7 @@
 
 import React from 'react';
 import { ViewState, UserProfile } from '../types';
+import { GITHUB_REPO_URL } from '../constants';
 
 interface SidebarProps {
   currentView: ViewState;
@@ -45,6 +46,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user }) =>
           return (
             <button
               key={item.id}
+              aria-label={item.label}
               onClick={() => onChangeView(item.id)}
               className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${isActive ? 'text-white' : 'text-muted hover:bg-white/5 hover:text-white'
                 }`}
@@ -72,6 +74,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user }) =>
             <p className="mt-2 text-xs text-muted leading-relaxed">0% Expense Ratio.<br />Built for the community</p>
           </div>
           <button
+            aria-label="Buy me a coffee"
             onClick={() => onChangeView(ViewState.SUPPORT)}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-white py-1.5 text-sm font-semibold text-black transition-all hover:bg-amber-50 hover:text-amber-900 group"
           >
@@ -95,7 +98,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user }) =>
         */}
         {/* Source Code Link - AGPL Compliance */}
         <a
-          href={import.meta.env.VITE_GITHUB_REPO || 'https://github.com/DomNixon/BogleConvert'}
+          href={GITHUB_REPO_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-2 text-xs text-muted hover:text-white transition-colors border-t border-outline pt-4"

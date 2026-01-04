@@ -16,7 +16,8 @@ lerna-debug.log*
 .gitignore
 
 
-# AI Agents Rules and Workflow
+# --- AI Agents & Private Workflows ---
+.agent/
 /Rules/
 /Workflow/
 /Logs/

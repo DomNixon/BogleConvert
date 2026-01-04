@@ -69,7 +69,7 @@ This design ensures:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/DomNixon/BogleConvert.git
+   git clone https://github.com/BogleConvert/BogleConvert.git
    cd BogleConvert
    ```
 
@@ -84,7 +84,7 @@ This design ensures:
    
    ```bash
    # Frontend Variables
-   VITE_GITHUB_REPO=https://github.com/DomNixon/BogleConvert
+   VITE_GITHUB_REPO=https://github.com/BogleConvert/BogleConvert
    # ... other variables
    ```
 
@@ -219,7 +219,7 @@ This project is maintained by **Mid Michigan Connections LLC**.
 
 For questions or bug reports:
 
-- **GitHub**: [Issues](https://github.com/DomNixon/BogleConvert/issues)
+- **GitHub**: [Issues](https://github.com/BogleConvert/BogleConvert/issues)
 
 ---
 

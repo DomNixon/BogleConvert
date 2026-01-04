@@ -29,7 +29,7 @@ const HelpAbout: React.FC = () => {
                     <h2 className="text-2xl font-bold font-display text-white">Why We Created This Tool</h2>
                     <div className="space-y-4 text-gray-300 leading-relaxed text-base md:text-lg font-light">
                         <p>This service was built for the <span className="text-white font-medium">"Recovering Stock Picker."</span></p>
-                        <p>Many of us discover the Bogleheads® investment philosophy—low-cost, diversified, index fund investing—after we have already accumulated a collection of individual stocks. We often hold onto these legacy positions because we don't know if they are actually helping or hurting our long-term wealth.</p>
+                        <p>Many of us discover the <a href="https://www.bogleheads.org/wiki/Bogleheads%C2%AE_investment_philosophy" target="_blank" rel="noopener noreferrer" className="text-secondary hover:underline">Bogleheads® investment philosophy</a>, a low-cost, diversified, index fund investing only after we have already accumulated a collection of individual stocks. We often hold onto these legacy positions because we don't know if they are actually helping or hurting our long-term wealth.</p>
                         <p>We created BogleConvert to answer one simple question:</p>
                         <blockquote className="border-l-4 border-primary pl-6 py-2 my-6 text-white font-medium italic bg-white/5 rounded-r-lg">
                             "What is the opportunity cost of holding this individual stock instead of just 'buying the haystack' (VT)?"

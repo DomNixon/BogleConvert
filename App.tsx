@@ -37,14 +37,30 @@ import {
   mergePortfolios,
   mergeStockIntoPortfolio
 } from './services/dataService';
+import { parseAndFetchPortfolio } from './services/importService';
+import { usePortfolio } from './hooks/usePortfolio';
+import { DEFAULT_BENCHMARK, DEFAULT_REPORT_TICKER } from './constants';
+
+
+
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.DASHBOARD);
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [portfolio, setPortfolio] = useState<StockPosition[]>([]);
+  const {
+    portfolio,
+    setPortfolio,
+    updateStock,
+    addStock,
+    deleteStock,
+    updateTicker,
+    updateRow,
+    recalculateWeights
+  } = usePortfolio();
+
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
-  const [reportTicker, setReportTicker] = useState<string>("AAPL");
+  const [reportTicker, setReportTicker] = useState<string>(DEFAULT_REPORT_TICKER);
   const [lastDataUpdate, setLastDataUpdate] = useState<string | null>(null);
 
   // Import progress tracking
@@ -52,25 +68,6 @@ const App: React.FC = () => {
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const [importError, setImportError] = useState<string | null>(null);
 
-
-
-  // Helper to recalculate portfolio weights based on current value
-  const recalculateWeights = (portfolioData: StockPosition[]): StockPosition[] => {
-    const totalValue = portfolioData.reduce((sum, stock) => {
-      const value = (stock.currentPrice || 0) * (stock.shares || 0);
-      return sum + value;
-    }, 0);
-
-    if (totalValue === 0) {
-      return portfolioData.map(stock => ({ ...stock, weight: 0 }));
-    }
-
-    return portfolioData.map(stock => {
-      const value = (stock.currentPrice || 0) * (stock.shares || 0);
-      const weight = (value / totalValue) * 100;
-      return { ...stock, weight: Number(weight.toFixed(1)) };
-    });
-  };
 
   useEffect(() => {
     const initData = async () => {
@@ -121,9 +118,9 @@ const App: React.FC = () => {
     };
 
     initData();
-  }, []);
+  }, [recalculateWeights]);
 
-  const [benchmark, setBenchmark] = useState<'VT' | 'VTI' | 'VOO'>('VT');
+  const [benchmark, setBenchmark] = useState<'VT' | 'VTI' | 'VOO'>(DEFAULT_BENCHMARK);
 
   // Recalculate chart data whenever portfolio or benchmark changes
   useEffect(() => {
@@ -143,84 +140,7 @@ const App: React.FC = () => {
     }
   }, [portfolio, loading]);
 
-  const handleUpdateStock = (index: number, field: keyof StockPosition, value: string | number) => {
-    setPortfolio(prevPortfolio => {
-      const newPortfolio = [...prevPortfolio];
-      const stock = { ...newPortfolio[index] };
 
-      // Update the specific field
-      // FIX: Use type assertion for dynamic key access to ensure type safety
-      if (field in stock) {
-        (stock as any)[field] = value;
-      }
-
-      // Recalculate returns if Average Cost or Years is updated
-      if (field === 'avgCost' || field === 'yearsHeld') {
-        const updatedStock = calculateStats(stock);
-        Object.assign(stock, updatedStock); // Merge updated stats back into stock object
-      }
-
-      newPortfolio[index] = stock;
-
-      // Recalculate weights if shares changed
-      if (field === 'shares') {
-        return recalculateWeights(newPortfolio);
-      }
-
-      return newPortfolio;
-    });
-  };
-
-  const handleTickerBlur = async (index: number, ticker: string) => {
-    if (!ticker) return;
-
-    try {
-      const quote = await fetchStockQuote(ticker);
-      if (quote) {
-        setPortfolio(prev => {
-          const newPortfolio = [...prev];
-          const stock = { ...newPortfolio[index] };
-          stock.name = quote.name;
-          stock.currentPrice = quote.price;
-          stock.sector = quote.sector;
-          stock.lastUpdated = quote.lastUpdated;
-
-
-          const updatedStock = calculateStats(stock);
-          Object.assign(stock, updatedStock);
-
-          // Check if this ticker exists elsewhere in the portfolio (excluding current index)
-          const duplicateIndex = newPortfolio.findIndex((p, i) => i !== index && p.ticker.toUpperCase() === ticker.toUpperCase());
-
-          if (duplicateIndex !== -1) {
-            // Merge current into duplicate
-            const merged = mergeStockIntoPortfolio([newPortfolio[duplicateIndex]], stock)[0];
-            newPortfolio[duplicateIndex] = merged;
-
-            // Remove the current row since it's now merged
-            newPortfolio.splice(index, 1);
-          } else {
-            newPortfolio[index] = stock;
-          }
-
-
-
-          // Recalculate weights since currentPrice changed
-          return recalculateWeights(newPortfolio);
-        });
-      }
-    } catch (e) {
-      console.error("Failed to fetch quote on blur", e);
-    }
-  };
-
-  const handleDeleteRow = (index: number) => {
-    setPortfolio(prev => {
-      const filtered = prev.filter((_, i) => i !== index);
-      // Recalculate weights after deletion
-      return recalculateWeights(filtered);
-    });
-  };
 
   // Wrapper for view navigation to handle cleanup
   const handleViewChange = (view: ViewState) => {
@@ -238,124 +158,27 @@ const App: React.FC = () => {
     handleViewChange(ViewState.PHILOSOPHY);
   };
 
-  const handleAddRow = () => {
-    const newStock: StockPosition = {
-      ticker: '',
-      name: '',
-      avgCost: 0,
-      currentPrice: 0,
-      shares: 0,
-      yearsHeld: 0,
-      nominalReturn: 0,
-      inflationAdjReturn: 0,
-      status: 'Tracking Market',
-      sector: 'Unknown',
-      weight: 0,
-      cagr: 0
-    };
-    setPortfolio([...portfolio, newStock]);
-  };
+
 
   const handleBulkImport = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const text = e.target?.result as string;
-      if (!text) return;
+    setImporting(true);
+    setImportError(null);
+    setImportProgress({ current: 0, total: 0 });
 
-      setImporting(true);
-      setImportError(null);
-
-      const rows = text.split('\n');
-      const rawStocks: StockPosition[] = [];
-
-      // Helper for cleaning numbers (strip currency, commas)
-      const cleanNumber = (val: string) => {
-        if (!val) return 0;
-        return parseFloat(val.replace(/[^0-9.-]+/g, '')) || 0;
-      };
-
-      // Skip header if present
-      const startIdx = rows[0].toLowerCase().includes('ticker') ? 1 : 0;
-      const validRows: Array<{ ticker: string; avgCost: number; shares: number; yearsHeld: number }> = [];
-
-      // Parse all rows first
-      for (let i = startIdx; i < rows.length; i++) {
-        const row = rows[i].split(',').map(cell => cell.trim());
-        if (row.length < 2 || !row[0]) continue;
-
-        const ticker = row[0].toUpperCase();
-        const avgCost = row[1] ? cleanNumber(row[1]) : 0;
-        const shares = row[2] ? cleanNumber(row[2]) : 0;
-        const yearsHeld = row[3] ? cleanNumber(row[3]) : 0;
-
-        validRows.push({ ticker, avgCost, shares, yearsHeld });
-      }
-
-      setImportProgress({ current: 0, total: validRows.length });
-
-      // Batch fetch quotes (10 at a time to avoid overwhelming the API)
-      const BATCH_SIZE = 10;
-      let successCount = 0;
-      let failCount = 0;
-
-      for (let i = 0; i < validRows.length; i += BATCH_SIZE) {
-        const batch = validRows.slice(i, i + BATCH_SIZE);
-
-        const batchResults = await Promise.all(
-          batch.map(async (row) => {
-            try {
-              const quote = await fetchStockQuote(row.ticker);
-
-              let stock: StockPosition = {
-                ticker: row.ticker,
-                name: quote?.name || row.ticker,
-                avgCost: row.avgCost,
-                currentPrice: quote?.price || 0,
-                shares: row.shares,
-                yearsHeld: row.yearsHeld,
-                nominalReturn: 0,
-                inflationAdjReturn: 0,
-                status: 'Tracking Market',
-                sector: quote?.sector || 'Unknown',
-                weight: 0,
-                cagr: 0,
-                lastUpdated: quote?.lastUpdated || new Date().toLocaleString()
-              };
-
-              stock = calculateStats(stock);
-              successCount++;
-              return stock;
-            } catch (err) {
-              console.warn(`Could not fetch data for imported ticker ${row.ticker}`, err);
-              failCount++;
-              return null;
-            }
-          })
-        );
-
-        // Filter out failed fetches and add successful ones
-        rawStocks.push(...batchResults.filter((s): s is StockPosition => s !== null));
-
-        // Update progress
-        setImportProgress({ current: Math.min(i + BATCH_SIZE, validRows.length), total: validRows.length });
-      }
-
-      // Show error summary if any failed
-      if (failCount > 0) {
-        setImportError(`Successfully imported ${successCount} of ${validRows.length} tickers. ${failCount} failed.`);
-      }
-
-      // 1. Consolidate the *imported* list first (handle duplicates within the CSV)
-      const consolidatedImports = mergePortfolios([], rawStocks);
-
-      // 2. Merge consolidated imports into main portfolio
+    parseAndFetchPortfolio(
+      file,
+      fetchStockQuote,
+      calculateStats,
+      mergePortfolios,
+      (current, total) => setImportProgress({ current, total })
+    ).then((consolidatedImports) => {
+      // Merge consolidated imports into main portfolio
       if (consolidatedImports.length > 0) {
         setPortfolio(prev => {
           const merged = mergePortfolios(prev, consolidatedImports);
           return recalculateWeights(merged);
         });
       }
-
       setImporting(false);
 
       // Clear progress after 3 seconds
@@ -363,8 +186,11 @@ const App: React.FC = () => {
         setImportProgress({ current: 0, total: 0 });
         setImportError(null);
       }, 3000);
-    };
-    reader.readAsText(file);
+    }).catch((err) => {
+      console.error("Import failed", err);
+      setImportError("Failed to parse file or fetch data.");
+      setImporting(false);
+    });
   };
 
   const handleLoadDemo = () => {
@@ -381,26 +207,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleUpdateRow = (index: number, data: Partial<StockPosition>) => {
-    setPortfolio(prev => {
-      const newPortfolio = [...prev];
-      const stock = { ...newPortfolio[index], ...data };
 
-      // Recalculate stats if financial fields changed
-      if ('avgCost' in data || 'yearsHeld' in data || 'currentPrice' in data) {
-        Object.assign(stock, calculateStats(stock));
-      }
-
-      newPortfolio[index] = stock;
-
-      // Recalculate weights if shares changed
-      if ('shares' in data) {
-        return recalculateWeights(newPortfolio);
-      }
-
-      return newPortfolio;
-    });
-  };
 
   if (loading || !user) {
     return (
@@ -420,12 +227,12 @@ const App: React.FC = () => {
           <Dashboard
             portfolio={portfolio}
             chartData={chartData}
-            onUpdateStock={handleUpdateStock}
-            onUpdateRow={handleUpdateRow}
-            onTickerBlur={handleTickerBlur}
-            onDeleteRow={handleDeleteRow}
+            onUpdateStock={updateStock}
+            onUpdateRow={updateRow}
+            onTickerBlur={updateTicker}
+            onDeleteRow={deleteStock}
             onViewReport={handleViewReport}
-            onAddRow={handleAddRow}
+            onAddRow={addStock}
             onBulkImport={handleBulkImport}
             onLoadDemo={handleLoadDemo}
             benchmark={benchmark}
@@ -472,12 +279,12 @@ const App: React.FC = () => {
           <Dashboard
             portfolio={portfolio}
             chartData={chartData}
-            onUpdateStock={handleUpdateStock}
-            onUpdateRow={handleUpdateRow}
-            onTickerBlur={handleTickerBlur}
-            onDeleteRow={handleDeleteRow}
+            onUpdateStock={updateStock}
+            onUpdateRow={updateRow}
+            onTickerBlur={updateTicker}
+            onDeleteRow={deleteStock}
             onViewReport={handleViewReport}
-            onAddRow={handleAddRow}
+            onAddRow={addStock}
             onBulkImport={handleBulkImport}
             onLoadDemo={handleLoadDemo}
             benchmark={benchmark}
@@ -501,6 +308,7 @@ const App: React.FC = () => {
       {/* Mobile Nav Overlay */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-outline flex justify-around p-3 z-50 pb-safe">
         <button
+          aria-label="Portfolio"
           onClick={() => handleViewChange(ViewState.DASHBOARD)}
           className={`flex flex-col items-center gap-1 ${currentView === ViewState.DASHBOARD ? 'text-secondary' : 'text-muted'}`}
         >
@@ -508,6 +316,7 @@ const App: React.FC = () => {
           <span className="text-[10px]">Portfolio</span>
         </button>
         <button
+          aria-label="Stock Report"
           onClick={() => handleViewChange(ViewState.REPORT)}
           className={`flex flex-col items-center gap-1 ${currentView === ViewState.REPORT ? 'text-secondary' : 'text-muted'}`}
         >
@@ -515,6 +324,7 @@ const App: React.FC = () => {
           <span className="text-[10px]">Report</span>
         </button>
         <button
+          aria-label="Analysis"
           onClick={() => handleViewChange(ViewState.ANALYSIS)}
           className={`flex flex-col items-center gap-1 ${currentView === ViewState.ANALYSIS ? 'text-secondary' : 'text-muted'}`}
         >
@@ -522,6 +332,7 @@ const App: React.FC = () => {
           <span className="text-[10px]">Analysis</span>
         </button>
         <button
+          aria-label="Settings"
           onClick={() => handleViewChange(ViewState.SETTINGS)}
           className={`flex flex-col items-center gap-1 ${currentView === ViewState.SETTINGS ? 'text-secondary' : 'text-muted'}`}
         >
@@ -529,6 +340,7 @@ const App: React.FC = () => {
           <span className="text-[10px]">Settings</span>
         </button>
         <button
+          aria-label="Support"
           onClick={() => handleViewChange(ViewState.SUPPORT)}
           className={`flex flex-col items-center gap-1 ${currentView === ViewState.SUPPORT ? 'text-secondary' : 'text-muted'}`}
         >
