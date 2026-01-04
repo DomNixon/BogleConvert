@@ -358,7 +358,7 @@ const DashboardChart = React.memo(({ chartData, benchmark, totalCost }: { chartD
                 </div>
             </div>
 
-            <div className="h-[300px] w-full">
+            <div className="h-[250px] md:h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={processedData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <defs>
@@ -558,10 +558,23 @@ const Dashboard: React.FC<DashboardProps> = ({
     return (
         <div className="flex h-full w-full flex-col overflow-hidden relative">
             {/* Header */}
-            <header className="flex flex-shrink-0 flex-col gap-4 border-b border-outline bg-surface p-6 md:flex-row md:items-center md:justify-between z-10">
-                <div>
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-3xl font-bold font-display tracking-tight text-white">Portfolio Dashboard</h1>
+            <header className="flex flex-shrink-0 flex-col gap-3 border-b border-outline bg-surface p-4 pt-safe pt-6 md:p-6 md:flex-row md:items-center md:justify-between z-10 sticky top-0 md:static">
+                {/* Mobile Top Row: Data Text (Left) + Title (Right) */}
+                <div className="flex justify-between items-center md:hidden w-full">
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-xs text-muted">cloud</span>
+                        <p className="text-[10px] text-muted">
+                            Data updated daily.
+                            {lastUpdated && <span className="text-secondary ml-1 inline">Last: {lastUpdated}</span>}
+                        </p>
+                    </div>
+                    <h1 className="text-xl font-bold font-display tracking-tight text-white">Portfolio</h1>
+                </div>
+
+                {/* Desktop Left Side */}
+                <div className="hidden md:flex flex-col gap-2">
+                    <div className="flex items-center justify-start gap-3">
+                        <h1 className="text-3xl font-bold font-display tracking-tight text-white">Portfolio</h1>
                         <div className="relative">
                             <select
                                 value={benchmark}
@@ -575,24 +588,25 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-muted text-lg pointer-events-none">expand_more</span>
                         </div>
                     </div>
-                    <div className="flex items-start gap-2 mt-1">
-                        <p className="text-muted text-base">Track your real returns against inflation and the market.</p>
-                    </div>
-                    <div className="flex items-center gap-2 mt-2">
+
+                    <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-sm text-muted">cloud</span>
                         <p className="text-xs text-muted">
-                            Market data updated daily via BogleConvert Cloud.
-                            {lastUpdated && <span className="text-secondary ml-1">Last Data Pull: {lastUpdated}</span>}
+                            Data updated daily.
+                            {lastUpdated && <span className="text-secondary ml-1">Last: {lastUpdated}</span>}
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
+
+                {/* Controls Row (Mobile: 3 cols, Desktop: Flex) */}
+                <div className="grid grid-cols-3 gap-2 md:flex md:items-center md:gap-3 w-full md:w-auto">
                     <button
                         onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-2 rounded-lg bg-white/5 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/10 border border-outline"
+                        className="flex items-center justify-center gap-2 rounded-lg bg-white/5 px-2 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/10 border border-outline w-full md:w-auto"
+                        title="Import CSV"
                     >
-                        <span className="material-symbols-outlined text-xl">upload_file</span>
-                        Import CSV
+                        <span className="material-symbols-outlined text-lg">upload_file</span>
+                        <span className="hidden md:inline">Import CSV</span>
                     </button>
                     <input
                         type="file"
@@ -608,11 +622,26 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                     <button
                         onClick={onAddRow}
-                        className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:scale-[1.02]"
+                        className="flex items-center justify-center gap-2 rounded-lg bg-primary px-2 py-2 text-xs font-semibold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:scale-[1.02] w-full md:w-auto"
+                        title="Add Position"
                     >
-                        <span className="material-symbols-outlined text-xl">add</span>
-                        Add Position
+                        <span className="material-symbols-outlined text-lg">add</span>
+                        <span className="hidden md:inline">Add Position</span>
                     </button>
+
+                    {/* Mobile-Only Benchmark Selector (3rd Button Slot) */}
+                    <div className="relative md:hidden w-full h-full">
+                        <select
+                            value={benchmark}
+                            onChange={(e) => onBenchmarkChange(e.target.value as 'VT' | 'VTI' | 'VOO')}
+                            className="appearance-none bg-white/5 border border-outline text-white text-[10px] rounded-lg pl-2 pr-6 py-2 h-full w-full focus:ring-2 focus:ring-secondary focus:border-secondary outline-none cursor-pointer hover:bg-white/10 transition-colors font-medium flex items-center"
+                        >
+                            <option value="VT" className="bg-bg-dark text-white">Global (VT)</option>
+                            <option value="VTI" className="bg-bg-dark text-white">US Total (VTI)</option>
+                            <option value="VOO" className="bg-bg-dark text-white">S&P 500 (VOO)</option>
+                        </select>
+                        <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-muted text-sm pointer-events-none">expand_more</span>
+                    </div>
                 </div>
             </header>
 
@@ -684,7 +713,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             onDragOver={handleDrag}
                             onDrop={handleDrop}
                         >
-                            <div className="overflow-x-auto">
+                            <div className="overflow-x-auto hidden md:block">
                                 <table className="w-full text-left">
                                     <thead className="border-b border-outline bg-bg-dark/50">
                                         <tr>
@@ -800,10 +829,96 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     </tbody>
                                 </table>
                             </div>
+
+                            {/* Mobile Card View */}
+                            <div className="flex flex-col gap-3 md:hidden p-3">
+                                {portfolio.map((stock, index) => (
+                                    <div key={index} className="bg-white/5 rounded-lg p-3 border border-outline flex flex-col gap-3">
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={stock.ticker}
+                                                        onChange={(e) => onUpdateStock(index, 'ticker', e.target.value)}
+                                                        onBlur={(e) => onTickerBlur && onTickerBlur(index, e.target.value)}
+                                                        className="bg-transparent font-bold text-lg text-white w-20 focus:outline-none uppercase"
+                                                    />
+                                                    <span className="text-xs text-muted truncate max-w-[100px]">{stock.name}</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => handleDeepDive(stock)} className="p-1.5 bg-white/5 rounded-md text-muted hover:text-white">
+                                                    <span className="material-symbols-outlined text-lg">visibility</span>
+                                                </button>
+                                                <button onClick={() => onDeleteRow(index)} className="p-1.5 bg-negative/10 rounded-md text-negative hover:bg-negative/20">
+                                                    <span className="material-symbols-outlined text-lg">delete</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <div className="flex flex-col gap-1 p-2 bg-black/20 rounded">
+                                                <span className="text-[10px] text-muted uppercase">Avg Cost</span>
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-muted text-xs">$</span>
+                                                    <input
+                                                        type="number"
+                                                        value={stock.avgCost || ''}
+                                                        onChange={(e) => onUpdateStock(index, 'avgCost', parseFloat(e.target.value))}
+                                                        className="bg-transparent w-full focus:outline-none font-mono"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col gap-1 p-2 bg-black/20 rounded text-center">
+                                                <span className="text-[10px] text-muted uppercase w-full">Shares</span>
+                                                <input
+                                                    type="number"
+                                                    value={stock.shares || ''}
+                                                    onChange={(e) => onUpdateStock(index, 'shares', parseFloat(e.target.value))}
+                                                    className="bg-transparent w-full focus:outline-none font-mono text-center"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-1 p-2 bg-black/20 rounded text-right">
+                                                <span className="text-[10px] text-muted uppercase w-full">Years</span>
+                                                <input
+                                                    type="number"
+                                                    value={stock.yearsHeld || ''}
+                                                    onChange={(e) => handleYearChange(index, e.target.value)}
+                                                    className="bg-transparent w-full focus:outline-none font-mono text-right"
+                                                    step="0.5"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-between items-center border-t border-white/5 pt-2 mt-1">
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] text-muted uppercase">Real Return</span>
+                                                <span className={`font-bold ${stock.inflationAdjReturn >= 0 ? 'text-secondary' : 'text-primary'}`}>
+                                                    {stock.inflationAdjReturn > 0 ? '+' : ''}{stock.inflationAdjReturn}%
+                                                </span>
+                                            </div>
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-[10px] text-muted uppercase">Value</span>
+                                                <span className="font-mono text-white">
+                                                    {CURRENCY_FORMATTER.format((stock.currentPrice * stock.shares))}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {portfolio.length === 0 && (
+                                    <div className="text-center py-8 text-muted flex flex-col items-center gap-2">
+                                        <span className="material-symbols-outlined text-3xl opacity-50">toc</span>
+                                        <p className="text-sm">No positions found.</p>
+                                        <button onClick={onAddRow} className="text-secondary text-sm font-medium">Add Position</button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Guide Hint */}
-                        <div className="text-center pb-8">
+                        <div className="text-center pb-24 md:pb-8">
                             <p className="text-muted text-sm">
                                 Need help understanding the chart colors? <button onClick={onViewGuide} className="text-white hover:underline">Check out The Guide</button>.
                             </p>
@@ -813,22 +928,24 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
 
                 {/* Deep Dive Panel (Slide Over) */}
-                {selectedStock && (
-                    <div className="absolute inset-0 z-20 flex justify-end bg-black/50 backdrop-blur-sm transition-opacity" onClick={closeDeepDive}>
-                        <div onClick={(e) => e.stopPropagation()} className="h-full">
-                            <DeepDivePanel
-                                stock={selectedStock}
-                                onClose={closeDeepDive}
-                                onViewReport={(ticker) => {
-                                    closeDeepDive();
-                                    onViewReport(ticker);
-                                }}
-                            />
+                {
+                    selectedStock && (
+                        <div className="absolute inset-0 z-20 flex justify-end bg-black/50 backdrop-blur-sm transition-opacity" onClick={closeDeepDive}>
+                            <div onClick={(e) => e.stopPropagation()} className="h-full">
+                                <DeepDivePanel
+                                    stock={selectedStock}
+                                    onClose={closeDeepDive}
+                                    onViewReport={(ticker) => {
+                                        closeDeepDive();
+                                        onViewReport(ticker);
+                                    }}
+                                />
+                            </div>
                         </div>
-                    </div>
-                )}
-            </div>
-        </div>
+                    )
+                }
+            </div >
+        </div >
     );
 };
 

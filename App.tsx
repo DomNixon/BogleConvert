@@ -512,6 +512,13 @@ const App: React.FC = () => {
           <span className={`material-symbols-outlined ${currentView === ViewState.SETTINGS ? 'fill' : ''}`}>settings</span>
           <span className="text-[10px]">Settings</span>
         </button>
+        <button
+          onClick={() => handleViewChange(ViewState.SUPPORT)}
+          className={`flex flex-col items-center gap-1 ${currentView === ViewState.SUPPORT ? 'text-secondary' : 'text-muted'}`}
+        >
+          <span className={`material-symbols-outlined ${currentView === ViewState.SUPPORT ? 'fill' : ''}`}>volunteer_activism</span>
+          <span className="text-[10px]">Support</span>
+        </button>
       </div>
     </div>
   );

@@ -91,7 +91,7 @@ const SupportPage: React.FC = () => {
 
     return (
         <div className="h-full overflow-auto bg-bg-dark">
-            <div className="mx-auto max-w-5xl px-4 py-8 md:px-8 md:py-12">
+            <div className="mx-auto max-w-5xl px-4 py-8 pb-24 md:px-8 md:py-12">
                 {/* Header */}
                 <div className="mb-8 text-center">
                     <div className="mb-4 flex justify-center">
